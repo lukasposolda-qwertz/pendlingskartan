@@ -1,0 +1,1187 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Pendlingskartan</title>
+<meta name="description" content="Hur Sverige pendlar till jobbet, kommun för kommun 2004–2024, och var tågen går. Ett personligt projekt av Lukas Posolda.">
+<meta name="author" content="Lukas Posolda">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='6' fill='%23A9B795'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;600&display=swap">
+<style>
+/* Layout: control panel left, map or analysis in the middle, municipality card top right. Identity: Fieldnote. */
+:root{
+  --bg:#F3F4F1; --panel:#FFFFFF; --fg:#1B2422; --muted:#56625F; --rule:#D6DAD5; --chip:#F3F4F1;
+  --sea:#F3F4F1; --land:#FFFFFF; --land-stroke:#D6DAD5; --mesh:#1B2422;
+  --out:#23605F; --in:#C08A1E; --accent:#23605F; --on-accent:#FFFFFF; --hi:#C08A1E; --lichen:#A9B795; --contour:#9DB5B1;
+  --link:#56625F; --halo:#FFFFFF; --bubble:#1B2422; --sel:#1B2422; --track:#56625F;
+  --c-fast:#C08A1E; --c-long:#5D7A8C; --c-reg:#23605F; --c-none:#D6DAD5;
+  --font:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --fs:15px; --fs-s:13px; --fs-xs:11.5px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#13201F; --panel:#1A2928; --fg:#E4EAE7; --muted:#A3B0AC; --rule:#2C3B39; --chip:#2C3B39;
+  --sea:#13201F; --land:#1A2928; --land-stroke:#2C3B39; --mesh:#E4EAE7;
+  --out:#5FA3A0; --in:#D9A53A; --accent:#6FB3AF; --on-accent:#13201F; --hi:#D9A53A; --contour:#2F4F4C;
+  --link:#A3B0AC; --halo:#1A2928; --bubble:#E4EAE7; --sel:#E4EAE7; --track:#A3B0AC;
+  --c-fast:#D9A53A; --c-long:#8FA9B8; --c-reg:#5FA3A0; --c-none:#56625F; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13201F; --panel:#1A2928; --fg:#E4EAE7; --muted:#A3B0AC; --rule:#2C3B39; --chip:#2C3B39;
+  --sea:#13201F; --land:#1A2928; --land-stroke:#2C3B39; --mesh:#E4EAE7;
+  --out:#5FA3A0; --in:#D9A53A; --accent:#6FB3AF; --on-accent:#13201F; --hi:#D9A53A; --contour:#2F4F4C;
+  --link:#A3B0AC; --halo:#1A2928; --bubble:#E4EAE7; --sel:#E4EAE7; --track:#A3B0AC;
+  --c-fast:#D9A53A; --c-long:#8FA9B8; --c-reg:#5FA3A0; --c-none:#56625F; color-scheme:dark}
+html,body{height:100%}
+body{background:var(--bg);color:var(--fg);font:400 var(--fs)/1.4 var(--font);margin:0}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+button,input,select{font:inherit;color:inherit}
+.wordmark{display:inline-flex;align-items:center;gap:.6em;font:600 12px/1 var(--font);letter-spacing:.14em;text-transform:uppercase;color:var(--fg);text-decoration:none;padding-top:6px}
+.wordmark::before{content:"";width:.9em;height:.9em;border-radius:999px;background:var(--lichen);flex:none}
+a{color:var(--accent);text-underline-offset:4px;text-decoration-thickness:1px}
+
+.app{display:grid;grid-template-columns:330px minmax(0,1fr);height:100%}
+aside{background:var(--panel);border-right:1px solid var(--rule);overflow-y:auto;padding-block:20px 16px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:18px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.lang{display:flex;border:1px solid var(--fg)}
+.lang button{border:0;background:transparent;padding:3px 9px;font-size:var(--fs-xs);font-weight:600;cursor:pointer;letter-spacing:.06em}
+.lang button[aria-pressed="true"]{background:var(--fg);color:var(--panel)}
+h1{font-weight:300;font-size:32px;line-height:1.05;letter-spacing:-.025em;margin:0;text-wrap:balance}
+h1 small{font-size:13px;font-weight:600;letter-spacing:.09em;vertical-align:top;margin-left:6px;background:var(--accent);color:var(--on-accent);padding:1px 5px}
+.lead{margin:8px 0 0;font-size:var(--fs);line-height:1.45}
+.sec{display:flex;flex-direction:column;gap:9px;border-top:1px solid var(--fg);padding-top:10px}
+.lab{font-size:var(--fs-xs);font-weight:600;letter-spacing:.09em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lab output{font-variant-numeric:tabular-nums;letter-spacing:0}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;border:1px solid var(--fg)}
+.seg button{border:0;border-left:1px solid var(--fg);background:transparent;padding:6px 3px;font-size:var(--fs-s);cursor:pointer}
+.seg button:first-child{border-left:0}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--panel);font-weight:600}
+.seg button:hover:not([aria-pressed="true"]){background:var(--chip)}
+.seg.modes{grid-auto-flow:row;grid-template-columns:repeat(3,1fr)}
+.seg.modes button{border-left:1px solid var(--fg);border-top:1px solid var(--fg)}
+.seg.modes button:nth-child(3n+1){border-left:0}
+.seg.modes button:nth-child(-n+3){border-top:0}
+.viewtog{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--fg)}
+.viewtog button{border:0;padding:9px 6px;background:transparent;cursor:pointer;font-weight:600;font-size:var(--fs-s);letter-spacing:.04em}
+.viewtog button[aria-pressed="true"]{background:var(--accent);color:var(--on-accent)}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0}
+.year{display:flex;align-items:center;gap:12px}
+.year .big{font-size:40px;font-weight:300;line-height:1;font-variant-numeric:tabular-nums;min-width:96px}
+.play{width:34px;height:34px;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer;flex:none;display:grid;place-items:center}
+.note{font-size:var(--fs-xs);line-height:1.35}
+.row{display:flex;gap:10px;align-items:center;font-size:var(--fs-s)}
+.row label{display:flex;gap:6px;align-items:center;cursor:pointer}
+select,.search{width:100%;padding:6px 8px;border:1px solid var(--fg);background:var(--panel);font-size:var(--fs-s)}
+.legend{display:flex;flex-direction:column;gap:5px;font-size:var(--fs-s)}
+.legend .k{display:flex;gap:8px;align-items:center}
+.sw{width:22px;height:0;border-top:3px solid;flex:none}
+.box{width:14px;height:12px;flex:none}
+.ramp{height:10px;border:1px solid var(--rule)}
+.ticks{display:flex;justify-content:space-between;font-size:var(--fs-xs);font-variant-numeric:tabular-nums}
+.steps{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:2px}
+.steps div{font-size:10px;text-align:center;font-variant-numeric:tabular-nums}
+.steps span{display:block;height:12px;margin-bottom:2px}
+.foot{margin-top:auto;font-size:var(--fs-xs);line-height:1.4;border-top:1px solid var(--fg);padding-top:8px}
+.linkbtn{color:inherit;text-decoration:underline;background:none;border:0;padding:0;cursor:pointer;font-size:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.mapwrap{position:relative;min-width:0;background:var(--sea);overflow:hidden}
+#map{width:100%;height:100%;display:block;touch-action:none}
+.kom{stroke:var(--land-stroke);stroke-width:.6;vector-effect:non-scaling-stroke;cursor:pointer}
+.kom:hover{stroke:var(--sel);stroke-width:1.4}
+.mesh{fill:none;stroke:var(--mesh);stroke-width:1.3;vector-effect:non-scaling-stroke;stroke-linejoin:round;pointer-events:none}
+.track{fill:none;stroke:var(--track);stroke-width:1.1;stroke-opacity:.8;vector-effect:non-scaling-stroke;pointer-events:none;stroke-linejoin:round}
+.seg-l{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;pointer-events:none}
+.flow{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;pointer-events:none}
+.rlink{stroke:var(--link);stroke-width:.8;vector-effect:non-scaling-stroke;opacity:.7;pointer-events:none}
+.bub{stroke:var(--halo);stroke-width:.8;vector-effect:non-scaling-stroke;pointer-events:none}
+.stn{fill:var(--panel);stroke:var(--fg);stroke-width:.8;vector-effect:non-scaling-stroke;cursor:pointer}
+.stn.on{fill:var(--hi)}
+.selo{fill:none;stroke:var(--sel);stroke-width:2.6;vector-effect:non-scaling-stroke;pointer-events:none}
+.lbl{font-size:12px;font-weight:600;fill:var(--fg);paint-order:stroke;stroke:var(--halo);stroke-width:3.2px;stroke-linejoin:round;pointer-events:none}
+.tip{position:absolute;pointer-events:none;background:var(--panel);border:1px solid var(--fg);padding:7px 10px;font-size:var(--fs-s);line-height:1.35;max-width:270px;z-index:7}
+.tip b{font-weight:600}
+.zoom{position:absolute;right:calc(14px + env(safe-area-inset-right,0px));bottom:calc(14px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;border:1px solid var(--fg);background:var(--panel)}
+.zoom button{width:34px;height:34px;border:0;background:transparent;font-size:18px;cursor:pointer}
+.zoom button+button{border-top:1px solid var(--fg)}
+.mapnote{position:absolute;left:calc(14px + env(safe-area-inset-left,0px));bottom:14px;font-size:var(--fs-xs);background:var(--panel);border:1px solid var(--fg);padding:6px 9px;max-width:300px}
+
+.card{position:absolute;top:14px;right:calc(14px + env(safe-area-inset-right,0px));width:350px;max-height:calc(100% - 28px);overflow-y:auto;background:var(--panel);border:1px solid var(--fg);padding:16px;display:flex;flex-direction:column;gap:12px;z-index:4}
+.card h2{margin:0;font-size:24px;font-weight:300;line-height:1.1}
+.chead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.badge{display:inline-block;font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;padding:2px 6px;margin-top:6px}
+.badge.core{background:var(--accent);color:var(--on-accent)}
+.badge.mem{border:1px solid var(--fg)}
+.x{border:1px solid var(--fg);background:transparent;width:28px;height:28px;cursor:pointer;flex:none}
+.big3{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid var(--fg)}
+.big3>div{padding:8px;border-left:1px solid var(--fg);min-width:0}
+.big3>div:first-child{border-left:0}
+.big3 .v{font-size:23px;font-weight:300;font-variant-numeric:tabular-nums;line-height:1.1}
+.l{font-size:9.5px;letter-spacing:.07em;text-transform:uppercase;font-weight:600;line-height:1.25}
+.big3 .l{margin-top:3px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.grid3 .v{font-variant-numeric:tabular-nums;font-size:var(--fs)}
+.spark{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.spark svg{width:100%;height:42px;display:block}
+.toplist{display:flex;flex-direction:column;gap:6px}
+.toplist button{all:unset;cursor:pointer;display:grid;grid-template-columns:1fr auto auto;gap:2px 8px;font-size:var(--fs-s);align-items:baseline}
+.toplist button:focus-visible{outline:2px solid var(--accent)}
+.toplist .n{text-decoration:underline;text-decoration-color:var(--rule);text-underline-offset:3px;min-width:0}
+.toplist button:hover .n{text-decoration-color:var(--fg)}
+.toplist .num{font-variant-numeric:tabular-nums;font-size:var(--fs-xs)}
+.toplist .bar{grid-column:1/-1;height:3px}
+.tchip{font-size:10px;font-weight:600;font-variant-numeric:tabular-nums;padding:1px 5px;border:1px solid var(--fg);white-space:nowrap}
+.tchip.ok{background:var(--hi);color:#1B2422;border-color:var(--hi)}
+.railbox{border:1px solid var(--fg);padding:10px;display:flex;flex-direction:column;gap:8px}
+.stlist{display:flex;flex-direction:column;gap:3px;font-size:var(--fs-s)}
+.stlist div{display:flex;justify-content:space-between;gap:8px}
+.stlist span:last-child{font-variant-numeric:tabular-nums}
+.empty{font-size:var(--fs-s);font-style:italic}
+
+/* analysvy */
+.dash{position:absolute;inset:0;overflow-y:auto;background:var(--bg);z-index:5;padding-block:24px 40px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
+.dash .in{max-width:1180px;display:flex;flex-direction:column;gap:22px}
+.dash h2{font-weight:300;font-size:36px;line-height:1.05;margin:0;text-wrap:balance}
+.dash .sub{color:var(--muted);max-width:70ch;margin:6px 0 0}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border:1px solid var(--fg);background:var(--panel)}
+.kpis>div{padding:14px 16px;border-left:1px solid var(--fg);min-width:0}
+.kpis>div:first-child{border-left:0}
+.kpis .v{font-size:clamp(24px,2.6vw,36px);white-space:nowrap;font-weight:400;line-height:1;font-variant-numeric:tabular-nums}
+.kpis .d{font-size:var(--fs-s);margin-top:6px;line-height:1.3}
+.panels{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.pan{background:var(--panel);border:1px solid var(--rule);border-top:2px solid var(--fg);padding:16px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.pan.wide{grid-column:1/-1}
+.pan h3{margin:0;font-size:18px;font-weight:600;line-height:1.2}
+.pan p{margin:0;font-size:var(--fs-s);max-width:80ch}
+.pan svg{display:block;width:100%;height:auto}
+.pan .axis text{fill:var(--fg);font-size:11px;font-family:var(--font)}
+.pan .axis line,.pan .axis path{stroke:var(--rule)}
+.pan .grid line{stroke:var(--rule);stroke-dasharray:2 3}
+.pan .vl{fill:var(--fg);font-size:11px;font-variant-numeric:tabular-nums;font-family:var(--font)}
+.pan .nl{fill:var(--fg);font-size:11.5px;font-family:var(--font)}
+.tblwrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:var(--fs-s)}
+th{text-align:left;font-size:10px;letter-spacing:.07em;text-transform:uppercase;font-weight:600;border-bottom:1px solid var(--fg);padding:6px 8px 6px 0}
+td{border-bottom:1px solid var(--rule);padding:6px 8px 6px 0;font-variant-numeric:tabular-nums}
+td.r,th.r{text-align:right}
+tr.clk{cursor:pointer}
+tr.clk:hover td{background:var(--chip)}
+.lg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:var(--fs-s)}
+.src{display:inline-block;vertical-align:middle;font-size:10px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;padding:2px 6px;margin-left:4px;line-height:1.3;white-space:nowrap}
+.src-scb{border:1px solid var(--fg);color:var(--fg)}
+.src-tt{background:var(--accent);color:var(--on-accent);border:1px solid var(--accent);border-radius:2px}
+.src-both{border:1px dashed var(--fg);color:var(--fg)}
+.readme{background:var(--panel);border:1px solid var(--rule);border-top:2px solid var(--fg);padding:16px}
+.readme-h{font-size:var(--fs);font-weight:600;margin-bottom:10px}
+.readme-g{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.ri{display:flex;flex-direction:column;gap:5px}
+.ri .src{margin-left:0}
+.ri p{margin:0;font-size:var(--fs-s);line-height:1.4}
+.dsec{margin-top:10px;border-top:1px solid var(--fg);padding-top:14px}
+.dsec-h{display:flex;gap:14px;align-items:flex-start}
+.dnum{font-size:36px;font-weight:400;color:var(--accent);line-height:.9;font-variant-numeric:tabular-nums}
+.dsec h3{margin:0;font-size:22px;font-weight:400;line-height:1.2}
+.dsec p{margin:4px 0 0;font-size:var(--fs-s);font-style:italic}
+.kpis.k3{grid-template-columns:repeat(3,minmax(0,1fr))}
+.kpis.k1x{grid-template-columns:minmax(0,1fr)}
+.kpis.k1x>div{display:flex;gap:18px;align-items:center}
+.kpis.k1x .d{margin-top:0;font-size:var(--fs);max-width:60ch}
+.kn{font-size:var(--fs-s);color:var(--muted);margin-top:4px}
+.lg span{display:inline-flex;gap:6px;align-items:center}
+
+.about{position:absolute;inset:0;background:var(--panel);overflow-y:auto;z-index:6;padding-block:28px;padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px))}
+.about .in{max-width:76ch;display:flex;flex-direction:column;gap:12px}
+.about h2{font-weight:300;font-size:30px;margin:0}
+.about h3{font-weight:600;font-size:var(--fs);margin:10px 0 0}
+.about p,.about li{margin:0;line-height:1.45}
+.about code{font-size:var(--fs-s)}
+
+@media (max-width:1000px){ .readme-g{grid-template-columns:minmax(0,1fr)} .kpis.k3{grid-template-columns:minmax(0,1fr)} .kpis.k3>div{border-left:0} .kpis.k3>div+div{border-top:1px solid var(--fg)} .kpis.k1x>div{flex-direction:column;align-items:flex-start;gap:6px} .panels{grid-template-columns:minmax(0,1fr)} .kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .kpis>div:nth-child(3){border-left:0} .kpis>div:nth-child(n+3){border-top:1px solid var(--fg)} }
+@media (max-width:820px){
+  html,body{height:auto}
+  .app{display:flex;flex-direction:column;height:auto}
+  aside{border-right:0;padding-right:max(16px,env(safe-area-inset-right,0px));padding-left:max(16px,env(safe-area-inset-left,0px))}
+  .mapwrap{height:78vh;order:-1}
+  .card{position:static;width:auto;max-height:none;border-left:0;border-right:0}
+  .foot{margin-top:0}
+  .about,.dash{position:fixed}
+  .dash{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .kpis .v{font-size:30px}
+  .mapnote{display:none}
+}
+.lab,.l,th,.src,.badge,.tchip,.lang button,.readme-h,.eyebrow{font-family:var(--mono);font-weight:500}
+.lab,.eyebrow{color:var(--accent)}
+.v,.big,output,.ticks,.steps div,td.r,.toplist .num,.kpis .v,.dnum,.year .big,.figure{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pan .vl,.pan .axis text{font-family:var(--mono)}
+.d,.note,.pan p{color:var(--muted)}
+.play{border-radius:2px}
+.viewtog,.seg,select,.search,.lang{border-radius:2px;overflow:hidden}
+/* about */
+.ah{position:relative;padding:8px 0 24px;border-bottom:2px solid var(--fg);margin-bottom:8px;overflow:hidden}
+.ah canvas{position:absolute;right:-20px;top:0;width:250px;height:100%;pointer-events:none}
+.ah>*:not(canvas){position:relative}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.about h2{font-weight:300;font-size:40px;line-height:1.1;letter-spacing:-.025em;margin:6px 0 10px}
+.about .lead2{font-size:18px;line-height:1.6;max-width:38ch}
+.about h3{font-weight:600;font-size:20px;margin:22px 0 2px}
+.about dl{display:grid;grid-template-columns:minmax(0,200px) minmax(0,1fr);gap:8px 18px;margin:6px 0 0}
+.about dt{font-weight:600}
+.about dd{margin:0}
+.about table{font-size:var(--fs-s)}
+.about td{vertical-align:top;padding-right:14px}
+.about .cite{font-family:var(--mono);font-size:12.5px;border-left:2px solid var(--rule);padding:6px 12px;line-height:1.6}
+.about .meta{font-family:var(--mono);font-size:12px;color:var(--muted);max-width:44ch}
+@media (max-width:900px){.ah canvas{display:none}.about .lead2{max-width:none}}
+@media (max-width:640px){.about dl{grid-template-columns:minmax(0,1fr)}.about dd{margin-bottom:8px}.ah canvas{display:none}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside id="side">
+    <div class="top">
+      <a class="wordmark" href="https://github.com/lukasposolda-qwertz" rel="author">Lukas Posolda</a>
+      <div class="lang" role="group" aria-label="Språk / Language"><button id="lang-sv" aria-pressed="true">SV</button><button id="lang-en" aria-pressed="false">EN</button></div>
+    </div>
+    <div>
+      <h1><span data-t="title"></span></h1>
+      <p class="lead" data-t="lead"></p>
+    </div>
+    <div class="viewtog" id="view"><button data-v="map" aria-pressed="true" data-t="v_map"></button><button data-v="dash" aria-pressed="false" data-t="v_dash"></button></div>
+
+    <div class="sec">
+      <div class="lab" data-t="map"></div>
+      <div class="seg modes" id="mode">
+        <button data-v="dus" aria-pressed="true" data-t="m_dus"></button>
+        <button data-v="net" aria-pressed="false" data-t="m_net"></button>
+        <button data-v="ind" aria-pressed="false" data-t="m_ind"></button>
+        <button data-v="rail" aria-pressed="false" data-t="m_rail"></button>
+        <button data-v="time" aria-pressed="false" data-t="m_time"></button>
+        <button data-v="fit" aria-pressed="false" data-t="m_fit"></button>
+      </div>
+      <div class="note" id="modenote"></div>
+      <div id="ctl-dus" class="sec" style="border:0;padding:0">
+        <div class="lab"><span data-t="thr"></span><output id="thr-o">10 %</output></div>
+        <input type="range" id="thr" min="3" max="30" step="1" value="10" aria-label="Tröskel">
+        <div class="row"><label><input type="checkbox" id="cons"><span data-t="cons"></span></label></div>
+        <div class="row"><label><input type="checkbox" id="links" checked><span data-t="links"></span></label></div>
+      </div>
+      <div id="ctl-ind" hidden>
+        <select id="ind" aria-label="Indikator"></select>
+      </div>
+      <div id="ctl-rail" hidden class="sec" style="border:0;padding:0">
+        <div class="row"><label><input type="checkbox" id="rail-c" checked><span data-t="rail_c"></span></label></div>
+        <div class="row"><label><input type="checkbox" id="rail-f" checked><span data-t="rail_f"></span></label></div>
+        <div class="row"><label><input type="checkbox" id="rail-r" checked><span data-t="rail_r"></span></label></div>
+      </div>
+      <div id="ctl-fit" hidden class="sec" style="border:0;padding:0">
+        <div class="lab"><span data-t="fitmax"></span><output id="fitm-o">60 min</output></div>
+        <input type="range" id="fitm" min="20" max="120" step="5" value="60" aria-label="Restidsgräns">
+      </div>
+      <div class="row"><label><input type="checkbox" id="tracks" checked><span data-t="tracks"></span></label></div>
+      <input class="search" id="search" list="komlist" autocomplete="off">
+      <datalist id="komlist"></datalist>
+    </div>
+
+    <div class="sec">
+      <div class="lab" data-t="year"></div>
+      <div class="year">
+        <div class="big" id="year-o">2024</div>
+        <input type="range" id="year" min="2004" max="2024" step="1" value="2024" aria-label="År">
+        <button class="play" id="play" aria-label="Spela upp">▶</button>
+      </div>
+      <div class="note" id="breaknote"></div>
+    </div>
+
+    <div class="sec">
+      <div class="lab" data-t="flows"></div>
+      <div class="seg" id="dir">
+        <button data-v="both" aria-pressed="true" data-t="both"></button>
+        <button data-v="out" aria-pressed="false" data-t="out"></button>
+        <button data-v="in" aria-pressed="false" data-t="in"></button>
+      </div>
+      <div class="seg" id="shape">
+        <button data-v="curved" aria-pressed="true" data-t="curved"></button>
+        <button data-v="straight" aria-pressed="false" data-t="straight"></button>
+      </div>
+      <div class="lab"><span data-t="minflow"></span><output id="minf-o"></output></div>
+      <input type="range" id="minf" min="0" max="9" step="1" value="4" aria-label="Minsta flöde">
+      <div class="lab"><span data-t="width"></span><output id="wid-o">1,0×</output></div>
+      <input type="range" id="wid" min="0.3" max="3" step="0.1" value="1" aria-label="Linjebredd">
+    </div>
+
+    <div class="sec">
+      <div class="lab"><span data-t="bubbles"></span><label class="row" style="font-size:var(--fs-xs)"><input type="checkbox" id="bub-on" checked><span data-t="show"></span></label></div>
+      <div class="seg" id="bub">
+        <button data-v="w" aria-pressed="true" data-t="b_w"></button>
+        <button data-v="j" aria-pressed="false" data-t="b_j"></button>
+      </div>
+      <div class="lab"><span data-t="size"></span><output id="bsz-o">1,0×</output></div>
+      <input type="range" id="bsz" min="0.3" max="2.5" step="0.1" value="1" aria-label="Bubbelstorlek">
+    </div>
+
+    <div class="sec">
+      <div class="lab" data-t="legend"></div>
+      <div class="legend" id="legend"></div>
+    </div>
+
+    <div class="foot">
+      <button class="linkbtn" id="about-btn" data-t="howlink"></button><br>
+      <span data-th="source"></span>
+    </div>
+  </aside>
+
+  <div class="mapwrap" id="wrap">
+    <svg id="map" role="img" aria-label="Karta över Sveriges kommuner, pendling och tågtrafik"></svg>
+    <div class="tip" id="tip" hidden></div>
+    <div class="mapnote" id="mapnote" hidden></div>
+    <div class="zoom"><button id="zin" aria-label="Zooma in">+</button><button id="zout" aria-label="Zooma ut">−</button></div>
+    <div class="card" id="card" hidden></div>
+    <div class="dash" id="dash" hidden><div class="in" id="dash-in"></div></div>
+    <div class="about" id="about" hidden><div class="in" id="about-in"></div></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="data.js" charset="utf-8"></script>
+<script src="rail.js" charset="utf-8"></script>
+<script>
+(() => {
+const P = window.PENDLA, RL = window.RAIL, N = P.codes.length;
+const LAN = {"01":"Stockholms län","03":"Uppsala län","04":"Södermanlands län","05":"Östergötlands län","06":"Jönköpings län","07":"Kronobergs län","08":"Kalmar län","09":"Gotlands län","10":"Blekinge län","12":"Skåne län","13":"Hallands län","14":"Västra Götalands län","17":"Värmlands län","18":"Örebro län","19":"Västmanlands län","20":"Dalarnas län","21":"Gävleborgs län","22":"Västernorrlands län","23":"Jämtlands län","24":"Västerbottens län","25":"Norrbottens län"};
+const DAYSTR = RL.day.slice(0,4)+"-"+RL.day.slice(4,6)+"-"+RL.day.slice(6);
+
+const T = {
+ sv:{title:"Pendlingskartan",lead:"Var bor folk, och var jobbar de? Kartan visar hur många som pendlar mellan Sveriges kommuner och var tågen går. Den visar inte hur många som tar tåget.",
+  v_map:"Karta",v_dash:"Analys",
+  map:"Kartläge",m_dus:"Regioner",m_net:"Pendling",m_ind:"Indikatorer",m_rail:"Tågtrafik",m_time:"Restid tåg",m_fit:"Pendling mot tågutbud",
+  mn_dus:"Pendlingsregioner: varje kommun går till den kommun dit flest pendlar, om andelen når tröskeln.",
+  mn_net:"Alla pendlingsflöden mellan kommuner över minsta flöde.",
+  mn_ind:"Färglägg kommunerna efter ett nyckeltal, även tågmått.",
+  mn_rail:"Tågtrafiken en vanlig tisdag ("+DAYSTR+"). Linjetjocklek = tåg per dag mellan två stationer.",
+  mn_time:"Snabbaste tågresa från vald kommun, morgonavgång 06–09 inklusive byten och väntan. Klicka på en kommun för att byta start.",
+  mn_fit:"Pendlingsflöden enligt SCB (alla färdsätt) färgade efter om tidtabellen har en tågförbindelse mellan kommunerna inom gränsen. Visar var tåget kan vara ett alternativ, inte hur många som åker tåg.",
+  thr:"Tröskel",cons:"Slå ihop kärnor i kedjor",links:"Visa regionlänkar",tracks:"Visa järnvägsnätet",
+  rail_c:"Regionaltåg",rail_f:"Snabbtåg",rail_r:"Fjärr- och interregionala tåg",fitmax:"Restidsgräns",
+  year:"År (pendling)",flows:"Flöden",both:"Båda",out:"Ut",in:"In",curved:"Böjda",straight:"Raka",minflow:"Minsta flöde",width:"Linjebredd",
+  bubbles:"Bubblor",show:"Visa",b_w:"Sysselsatta boende",b_j:"Arbetstillfällen",size:"Storlek",legend:"Teckenförklaring",
+  search:"Sök kommun …",howlink:"Om kartan: definitioner, källor och licenser",
+  source:"Ett personligt projekt av Lukas Posolda. Data: SCB och Trafiklab (CC0), järnvägsnät © OpenStreetMap-bidragsgivare (ODbL). Kod: MIT. <a href=\"https://github.com/lukasposolda-qwertz/pendlingskartan\">Källkod på GitHub</a>",
+  brk2019:"Tidsseriebrott 2019: ny datakälla (AGI) i RAMS.",brk2020:"Tidsseriebrott 2020: BAS ersätter RAMS (sysselsatta 15–74 år).",brkall:"Tidsseriebrott 2019 och 2020. Tågdata gäller tidtabellen hösten 2026.",
+  lg_region:"Kommun i en pendlingsregion (färg = region)",lg_indep:"Fristående kommun",lg_border:"Regiongräns",lg_link:"Regionlänk: andel ≥ tröskel till kärnan",
+  lg_out:"Utpendling från vald kommun",lg_in:"Inpendling till vald kommun",lg_net:"Pendlingsflöde mellan kommuner",lg_bub:"Bubbla = antal",lg_hint:"Klicka på en kommun för att se dess flöden.",
+  lg_track:"Järnväg (OpenStreetMap)",lg_stn:"Station, storlek = avgångar per dag",lg_fast:"Snabbtåg",lg_long:"Fjärr- och interregionala tåg",lg_reg:"Regional- och pendeltåg",
+  lg_time:"Restid med tåg från",lg_none:"Ingen tågresa inom 3 timmar",lg_fit_ok:"Tågförbindelse inom gränsen",lg_fit_slow:"Tågförbindelse, längre restid",lg_fit_no:"Ingen tågförbindelse inom 3 h",lg_fit_note:"Linjerna är pendlare med alla färdsätt (SCB). Färgen visar tågutbudet, inte färdsättet.",lg_from:"Startkommun",
+  i_self:"Bor och arbetar i kommunen (%)",i_out:"Utpendlare, andel av boende sysselsatta (%)",i_inshare:"Inpendlare, andel av arbetstillfällena (%)",i_ratio:"Arbetstillfällen per 100 boende sysselsatta",i_net:"Nettopendling (antal)",
+  i_dep:"Tågavgångar per dag",i_reach:"Utpendlare (alla färdsätt) med tågförbindelse ≤ 60 min till jobbkommunen (%)",i_reachin:"Inpendlare (alla färdsätt) med tågförbindelse ≤ 60 min från hemkommunen (%)",i_stock:"Restid med tåg till Stockholm (min)",
+  core:"Kärna",member:"Ingår i",indep:"Fristående",coreDep:"Kärna, beroende av",
+  k_self:"Bor och arbetar här",k_out:"Pendlar ut",k_infill:"Jobb tagna av inpendlare",
+  g_w:"Sysselsatta boende",g_j:"Arbetstillfällen",g_ratio:"Jobb / 100 boende",g_out:"Utpendlare",g_in:"Inpendlare",g_net:"Nettopendling",g_mem:"Kommuner i regionen",g_core:"Regionkärna",g_lan:"Län",
+  sp_w:"sysselsatta boende",sp_j:"arbetstillfällen",
+  topd:"Främsta mål: andel av boende sysselsatta · tågförbindelse",topo:"Främsta ursprung: inpendlare · tågförbindelse",none:"Inga flöden över 10 personer.",
+  rail_h:"Tåg i kommunen",r_st:"Stationer",r_dep:"Avgångar/dag",r_peak:"Avgångar 07–09",r_nost:"Ingen station med persontåg i tidtabellen.",
+  r_reach:"av utpendlarna (alla färdsätt) arbetar i en kommun dit det finns en tågförbindelse på högst 60 min",r_reach2:"Tågförbindelse enligt tidtabell. Säger inte hur många som åker tåg.",r_to:"Restid tåg till",
+  tip_w:"sysselsatta boende",tip_j:"arbetstillfällen",tip_self:"bor och arbetar här",tip_dep:"avgångar per dag",tip_peak:"under 07–09",tip_time:"Restid tåg",tip_pend:"pendlare",tip_all:"pendlare, alla färdsätt (SCB)",tip_conn:"Snabbaste tågförbindelse",
+  close:"Stäng",esc:"Esc stänger · pilar bläddrar",regions:"pendlingsregioner",play:"Spela upp",pause:"Pausa",min:"min",
+  d_title:"Pendling och tågutbud",d_sub:"Två fristående datakällor som här läggs bredvid varandra. Pendling enligt SCB för valt år, tågutbud enligt tidtabellen en vanlig tisdag ("+DAYSTR+").",
+  r_h:"Så ska analysen läsas",
+  r1t:"Pendling",r1s:"SCB, registerdata",r1:"Hur många som bor i en kommun och arbetar i en annan. Alla färdsätt räknas: bil, buss, tåg, cykel och distansarbete. Statistiken säger inget om hur man reser.",
+  r2t:"Tågutbud",r2s:"Tidtabell, GTFS",r2:"Vilka tåg som går och hur snabbt man kommer mellan kommunerna. Tidtabellen säger inget om hur många som reser.",
+  r3t:"Jämförelse",r3s:"Båda källorna",r3:"Vi lägger pendlingsflödena bredvid tågutbudet: finns det en snabb tågförbindelse där många pendlar? Det visar var tåget kan vara ett alternativ, inte hur många som åker tåg. Tågets faktiska andel kräver resvaneundersökningar eller resandestatistik.",
+  src_scb:"SCB",src_tt:"Tidtabell",src_both:"Jämförelse",
+  s1:"Pendling",s1d:"Alla färdsätt, valt år.",s2:"Tågutbud",s2d:"Tidtabell en vanlig tisdag ("+DAYSTR+").",s3:"Jämförelse: pendlingsflöden och tågförbindelser",s3d:"Pendlingsdata och tidtabell kopplade på kommunnivå. Inga siffror här beskriver faktiskt tågresande.",
+  k5:"av de sysselsatta arbetar i en annan kommun än där de bor",k6:"pendlingsflöden med minst 200 personer",k7:"kommuner med minst en station",k8:"kommunpar med direkttåg",
+  k1:"stationer med persontåg",k2:"persontåg en vanlig tisdag",k3:"pendlar över kommungräns",k4:"av pendlingen över kommungräns går mellan kommuner med en tågförbindelse på högst 60 min",k4n:"Andel av pendlarna med alla färdsätt, inte andel som åker tåg.",
+  p1:"Pendlingsflöden och snabbaste tågförbindelse",p1d:"Varje punkt är ett pendlingsflöde mellan två kommuner med minst 200 pendlare. Lodrätt: antal pendlare enligt SCB, alla färdsätt. Vågrätt: snabbaste tågförbindelsen enligt tidtabellen, oavsett hur pendlarna reser i dag. Uppe till vänster finns stora flöden där en snabb tågförbindelse finns, uppe till höger stora flöden där den är långsam eller saknas. Klicka på en punkt för att öppna kommunen.",
+  p1x:"Snabbaste tågförbindelse enligt tidtabell, minuter (morgon, inkl. byten)",p1n:"saknas",p1y:"pendlare, alla färdsätt (SCB, log)",lg_direct:"Direkttåg finns",lg_change:"Förbindelse med byte",lg_notrain:"Ingen tågförbindelse inom 3 h",
+  p2:"Stora pendlingsstråk med svag tågförbindelse",p2d:"Största pendlingsflödena (alla färdsätt) på 15–120 km där snabbaste tågförbindelsen tar mer än 60 minuter eller saknas. Visar var tåget har ett möjligt underlag, inte en uppmätt efterfrågan på tåg.",
+  th_from:"Från",th_to:"Till",th_n:"Pendlare, alla färdsätt",th_km:"Km",th_t:"Tågförbindelse",th_d:"Direkttåg/dag",
+  p3:"Pendling i stråk med tågförbindelse, per län",p3d:"Andel av länets utpendlare (alla färdsätt, flöden ≥ 10) som arbetar i en kommun dit det finns en tågförbindelse på högst 60 minuter. Inte andelen som åker tåg.",
+  p4:"Mest trafikerade stationer",p4d:"Avgångar en vanlig tisdag, uppdelat på tågslag.",
+  p5:"Har regionernas pendlingsstråk tågförbindelse till kärnan?",p5d:"Andel av pendlingen (alla färdsätt) från medlemskommunerna till regionkärnan som kommer från kommuner med en tågförbindelse på högst 45 minuter dit. Regioner enligt vald tröskel.",
+  open:"Öppna",regsize:"kommuner"},
+ en:{title:"Sweden Commute Map",lead:"Where do people live, and where do they work? The map shows how many people commute between Sweden's municipalities and where the trains run. It does not show how many of them take the train.",
+  v_map:"Map",v_dash:"Analysis",
+  map:"Map mode",m_dus:"Regions",m_net:"Commuting",m_ind:"Indicators",m_rail:"Rail traffic",m_time:"Train time",m_fit:"Commuting vs rail supply",
+  mn_dus:"Commuting regions: each municipality joins the one most of its commuters go to, if the share reaches the threshold.",
+  mn_net:"All commuter flows between municipalities above the minimum flow.",
+  mn_ind:"Colour municipalities by a measure, rail measures included.",
+  mn_rail:"Train traffic on a regular Tuesday ("+DAYSTR+"). Line width = trains per day between two stations.",
+  mn_time:"Fastest train journey from the selected municipality, morning departure 06–09 incl. transfers and waiting. Click a municipality to change the start.",
+  mn_fit:"Commuter flows from SCB (all modes) coloured by whether the timetable has a rail connection between the municipalities within the limit. Shows where rail could be an option, not how many take the train.",
+  thr:"Threshold",cons:"Merge chained cores",links:"Show region links",tracks:"Show the rail network",
+  rail_c:"Regional trains",rail_f:"High-speed trains",rail_r:"Long-distance and inter-regional",fitmax:"Travel-time limit",
+  year:"Year (commuting)",flows:"Flows",both:"Both",out:"Out",in:"In",curved:"Curved",straight:"Straight",minflow:"Min. flow",width:"Line width",
+  bubbles:"Bubbles",show:"Show",b_w:"Resident workers",b_j:"Jobs",size:"Size",legend:"Legend",
+  search:"Find a municipality …",howlink:"About: definitions, sources and licences",
+  source:"A personal project by Lukas Posolda. Data: Statistics Sweden and Trafiklab (CC0), rail network © OpenStreetMap contributors (ODbL). Code: MIT. <a href=\"https://github.com/lukasposolda-qwertz/pendlingskartan\">Source on GitHub</a>",
+  brk2019:"Series break 2019: new data source (AGI) in RAMS.",brk2020:"Series break 2020: BAS replaces RAMS (employed 15–74).",brkall:"Series breaks in 2019 and 2020. Rail data is the autumn 2026 timetable.",
+  lg_region:"Municipality in a commuting region (colour = region)",lg_indep:"Independent municipality",lg_border:"Region border",lg_link:"Region link: share ≥ threshold to the core",
+  lg_out:"Out-commuting from selected municipality",lg_in:"In-commuting to selected municipality",lg_net:"Commuter flow between municipalities",lg_bub:"Bubble = count",lg_hint:"Click a municipality to see its flows.",
+  lg_track:"Railway (OpenStreetMap)",lg_stn:"Station, size = departures per day",lg_fast:"High-speed trains",lg_long:"Long-distance and inter-regional",lg_reg:"Regional and commuter trains",
+  lg_time:"Train time from",lg_none:"No train journey within 3 hours",lg_fit_ok:"Rail connection within the limit",lg_fit_slow:"Rail connection, slower",lg_fit_no:"No rail connection within 3 h",lg_fit_note:"Lines are commuters by all modes (SCB). Colour shows rail supply, not mode of travel.",lg_from:"Start",
+  i_self:"Live and work in the municipality (%)",i_out:"Out-commuters, share of resident workers (%)",i_inshare:"In-commuters, share of jobs (%)",i_ratio:"Jobs per 100 resident workers",i_net:"Net commuting (people)",
+  i_dep:"Train departures per day",i_reach:"Out-commuters (all modes) with a rail connection ≤ 60 min to their work municipality (%)",i_reachin:"In-commuters (all modes) with a rail connection ≤ 60 min from home (%)",i_stock:"Train time to Stockholm (min)",
+  core:"Core",member:"Part of",indep:"Independent",coreDep:"Core, dependent on",
+  k_self:"Live & work here",k_out:"Work elsewhere",k_infill:"Jobs held by in-commuters",
+  g_w:"Resident workers",g_j:"Jobs",g_ratio:"Jobs / 100 workers",g_out:"Outbound",g_in:"Inbound",g_net:"Net balance",g_mem:"Municipalities in region",g_core:"Region core",g_lan:"County",
+  sp_w:"resident workers",sp_j:"jobs",
+  topd:"Top destinations: share of workers · rail connection",topo:"Top origins: in-commuters · rail connection",none:"No flows above 10 people.",
+  rail_h:"Rail in the municipality",r_st:"Stations",r_dep:"Departures/day",r_peak:"Departures 07–09",r_nost:"No station with passenger trains in the timetable.",
+  r_reach:"of out-commuters (all modes) work in a municipality with a rail connection of 60 min or less",r_reach2:"Rail connection from the timetable. Says nothing about how many take the train.",r_to:"Train time to",
+  tip_w:"resident workers",tip_j:"jobs",tip_self:"live & work here",tip_dep:"departures per day",tip_peak:"07–09",tip_time:"Train time",tip_pend:"commuters",tip_all:"commuters, all modes (SCB)",tip_conn:"Fastest rail connection",
+  close:"Close",esc:"Esc closes · arrows browse",regions:"commuting regions",play:"Play",pause:"Pause",min:"min",
+  d_title:"Commuting and rail supply",d_sub:"Two independent data sources shown side by side. Commuting from SCB for the selected year, rail supply from the timetable on a regular Tuesday ("+DAYSTR+").",
+  r_h:"How to read this analysis",
+  r1t:"Commuting",r1s:"SCB, register data",r1:"How many people live in one municipality and work in another. All modes count: car, bus, train, bike and remote work. The statistics say nothing about how people travel.",
+  r2t:"Rail supply",r2s:"Timetable, GTFS",r2:"Which trains run and how fast you can get between municipalities. The timetable says nothing about how many people travel.",
+  r3t:"Comparison",r3s:"Both sources",r3:"We set the commuter flows next to the rail supply: is there a fast rail connection where many people commute? This shows where rail could be an option, not how many take the train. Rail's actual share needs travel surveys or ridership data.",
+  src_scb:"SCB",src_tt:"Timetable",src_both:"Comparison",
+  s1:"Commuting",s1d:"All modes, selected year.",s2:"Rail supply",s2d:"Timetable on a regular Tuesday ("+DAYSTR+").",s3:"Comparison: commuter flows and rail connections",s3d:"Commuting data and timetable joined at municipality level. No figure here describes actual rail travel.",
+  k5:"of employed people work in another municipality than where they live",k6:"commuter flows with at least 200 people",k7:"municipalities with at least one station",k8:"municipality pairs with a direct train",
+  k1:"stations with passenger trains",k2:"passenger trains on a regular Tuesday",k3:"commute across a municipal border",k4:"of cross-border commuting is between municipalities with a rail connection of 60 min or less",k4n:"Share of commuters by all modes, not the share who take the train.",
+  p1:"Commuter flows and fastest rail connection",p1d:"Each dot is a commuter flow between two municipalities with at least 200 commuters. Vertical: number of commuters from SCB, all modes. Horizontal: the fastest rail connection in the timetable, regardless of how the commuters travel today. Top left are large flows with a fast rail connection, top right large flows where it is slow or missing. Click a dot to open the municipality.",
+  p1x:"Fastest rail connection in the timetable, minutes (morning, incl. transfers)",p1n:"none",p1y:"commuters, all modes (SCB, log)",lg_direct:"Direct train available",lg_change:"Connection with transfer",lg_notrain:"No rail connection within 3 h",
+  p2:"Large commuter corridors with weak rail connections",p2d:"Largest commuter flows (all modes) over 15–120 km where the fastest rail connection takes more than 60 minutes or is missing. Shows where rail has a potential market, not measured demand for rail.",
+  th_from:"From",th_to:"To",th_n:"Commuters, all modes",th_km:"Km",th_t:"Rail connection",th_d:"Direct trains/day",
+  p3:"Commuting in corridors with a rail connection, by county",p3d:"Share of the county's out-commuters (all modes, flows ≥ 10) who work in a municipality with a rail connection of 60 minutes or less. Not the share who take the train.",
+  p4:"Busiest stations",p4d:"Departures on a regular Tuesday, by type of train.",
+  p5:"Do the regions' commuter corridors have a rail connection to the core?",p5d:"Share of commuting (all modes) from member municipalities to the region core that comes from municipalities with a rail connection of 45 minutes or less. Regions follow the selected threshold.",
+  open:"Open",regsize:"municipalities"}
+};
+const ABOUT = {
+ sv:`<div class="ah"><canvas id="contour" aria-hidden="true"></canvas>
+  <div class="eyebrow">Om kartan</div>
+  <h2>Pendlingskartan</h2>
+  <p class="lead2">Var bor folk, och var jobbar de? Kartan visar hur många som pendlar mellan Sveriges 290 kommuner, år för år sedan 2004, och var tågen går i dag. Det är ett personligt projekt som bygger helt på öppna data.</p>
+  <p class="meta">Senast uppdaterad 2026-11-08 · pendling 2004–2024 · tidtabell ${DAYSTR}</p></div>
+
+ <h3>Vad kartan visar</h3>
+ <p>Kartan bygger på två saker som inte har med varandra att göra från början:</p>
+ <ul>
+  <li><strong>Pendling.</strong> Hur många som bor i en kommun och arbetar i en annan. Siffrorna kommer från SCB och gäller alla, oavsett hur de tar sig till jobbet: bil, buss, tåg, cykel eller hemifrån.</li>
+  <li><strong>Tåg.</strong> Vilka tåg som går och hur lång tid resan tar mellan kommunerna, enligt tidtabellen en vanlig tisdag.</li>
+ </ul>
+ <p>När de två läggs bredvid varandra syns var det finns ett snabbt tåg där många pendlar, och var det saknas. Kartan säger däremot inget om hur många som faktiskt åker tåg. Den uppgiften finns inte i någon av källorna. Den finns i resvaneundersökningar och i operatörernas resandestatistik.</p>
+
+ <h3>Definitioner</h3>
+ <dl>
+  <dt>Sysselsatt</dt><dd>En person som förvärvsarbetade i november det aktuella året, enligt SCB:s register. Från 2020 räknas personer 15–74 år, före 2020 personer från 16 år.</dd>
+  <dt>Bostadskommun</dt><dd>Kommunen där personen är folkbokförd.</dd>
+  <dt>Arbetsplatskommun</dt><dd>Kommunen där personens arbetsplats är registrerad. Den kan skilja sig från platsen personen faktiskt åker till, till exempel vid distansarbete eller när arbetsplatsen är registrerad på ett huvudkontor.</dd>
+  <dt>Pendlare</dt><dd>En sysselsatt som har sin arbetsplats i en annan kommun än bostadskommunen. Utpendlare räknas från bostadskommunen, inpendlare till arbetsplatskommunen.</dd>
+  <dt>Pendlingsflöde</dt><dd>Antalet pendlare från en kommun till en annan. Kartan ritar flöden med minst 10 personer.</dd>
+  <dt>Nettopendling</dt><dd>Inpendlare minus utpendlare. Positivt värde betyder fler jobb än sysselsatta boende.</dd>
+  <dt>Pendlingsandel</dt><dd>Pendlare från kommun A till kommun B delat med alla sysselsatta som bor i A.</dd>
+  <dt>Pendlingsregion</dt><dd>En grupp kommuner som hänger ihop genom pendling. En kommun hör till regionen dit flest av dess utpendlare åker, om andelen når tröskeln.</dd>
+  <dt>Tröskel</dt><dd>Den pendlingsandel som krävs för att en kommun ska räknas till en annan kommuns region. Standard är 10 procent.</dd>
+  <dt>Kärna</dt><dd>Kommunen som en region är samlad kring. Om två kommuner pekar mot varandra blir den med flest arbetstillfällen kärnan.</dd>
+  <dt>Fristående kommun</dt><dd>En kommun där ingen enskild destination når tröskeln och som inte själv är kärna.</dd>
+  <dt>Tågförbindelse</dt><dd>Den snabbaste tågresan från en station i ena kommunen till en station i den andra, med avgång 06–09 en vanlig tisdag. Byten och väntetid ingår, resan till och från stationen ingår inte.</dd>
+  <dt>Direkttåg</dt><dd>Ett tåg som stannar i båda kommunerna utan byte.</dd>
+  <dt>Tågslag</dt><dd>Snabbtåg, fjärr- och interregionala tåg samt regional- och pendeltåg, enligt trafikslaget i tidtabellen. Tunnelbana och spårväg ingår inte.</dd>
+ </dl>
+
+ <h3>Så har jag räknat</h3>
+ <p><strong>Pendlingsregioner.</strong> För varje kommun tar jag den kommun dit flest utpendlare åker. Om andelen når tröskeln hör kommunen till den kommunens region. <em>Slå ihop kärnor i kedjor</em> följer kedjan uppåt, så att större regioner växer fram.</p>
+ <p><strong>Restid med tåg.</strong> Jag söker i tidtabellen med en så kallad connection scan. Sökningen startar var 15:e minut mellan 06.00 och 08.45 från alla stationer i startkommunen och sparar den snabbaste resan till varje annan kommun. Byten kräver minst 3 minuter. Resor som tar mer än tre timmar räknas som att tågförbindelse saknas.</p>
+ <p><strong>Stationer</strong> kopplas till den kommun de ligger i. Stationer som heter som en närliggande kommun, till exempel Sundbyberg, kopplas till den kommunen.</p>
+
+ <h3>Förbehåll</h3>
+ <ul>
+  <li>SCB har bytt underlag två gånger: 2019 (ny datakälla i RAMS) och 2020 (BAS ersätter RAMS). Jämför därför inte åren rakt över de brytpunkterna.</li>
+  <li>Pendlingen gäller valt år, tågen tidtabellen hösten 2026. Jämförelsen är rimligast för de senaste åren.</li>
+  <li>Restiden räknas från station till station. Den som bor långt från stationen har längre resa.</li>
+  <li>Utan tunnelbana och spårväg ser till exempel Nacka och Lidingö ut att sakna tåg till Stockholm.</li>
+  <li>Kommungränserna är förenklade och passar för översikt, inte för exakta mätningar.</li>
+ </ul>
+
+ <h3>Källor och licenser</h3>
+ <div class="tblwrap"><table><thead><tr><th>Data</th><th>Källa</th><th>Licens</th></tr></thead><tbody>
+  <tr><td>Pendling 2004–2018</td><td>SCB, tabell TAB333 (RAMS)</td><td>CC0 1.0</td></tr>
+  <tr><td>Pendling 2019</td><td>SCB, tabell TAB5850 (RAMS)</td><td>CC0 1.0</td></tr>
+  <tr><td>Pendling 2020–2024</td><td>SCB, tabell TAB1830 (BAS)</td><td>CC0 1.0</td></tr>
+  <tr><td>Tidtabell</td><td>GTFS Sverige 2 från Trafiklab (Samtrafiken), hämtad via Mobility Database</td><td>CC0 1.0</td></tr>
+  <tr><td>Järnvägsnät</td><td>© OpenStreetMap-bidragsgivare</td><td>ODbL 1.0</td></tr>
+  <tr><td>Kommungränser</td><td>okfse/sweden-geojson, baserad på Valmyndighetens data</td><td>fri att återanvända</td></tr>
+  <tr><td>Kartbibliotek</td><td>D3 och TopoJSON client</td><td>ISC</td></tr>
+  <tr><td>Typsnitt</td><td>IBM Plex Sans och IBM Plex Mono</td><td>SIL OFL 1.1</td></tr>
+ </tbody></table></div>
+ <p>Siffrorna är mina bearbetningar av källornas data. De är inte officiell statistik, och projektet har inget samarbete med SCB, Trafiklab eller någon annan organisation.</p>
+
+ <h3>Licens för sajten</h3>
+ <ul>
+  <li><strong>Källkod:</strong> MIT-licens.</li>
+  <li><strong>Bearbetade data</strong> (pendlingsmatriser, restider, stationer): CC BY 4.0. Ange ”Lukas Posolda, Pendlingskartan”.</li>
+  <li><strong>Järnvägsnätet</strong> är härlett ur OpenStreetMap och omfattas av ODbL. Ange ”© OpenStreetMap-bidragsgivare”.</li>
+ </ul>
+
+ <h3>Upphovsperson</h3>
+ <p>Kartan är gjord av <a href="https://github.com/lukasposolda-qwertz" rel="author">Lukas Posolda</a>. Det är ett fristående, privat projekt. Källkod, data och skript finns på <a href="https://github.com/lukasposolda-qwertz/pendlingskartan">GitHub</a>. Hittar du ett fel? Skriv gärna ett ärende där.</p>
+ <h3>Så citerar du</h3>
+ <p class="cite">Posolda, L. (2026). Pendlingskartan: pendling och tåg i Sveriges kommuner. https://lukasposolda-qwertz.github.io/pendlingskartan/</p>
+ <p><button class="linkbtn" id="about-close">← Tillbaka till kartan</button></p>`,
+
+ en:`<div class="ah"><canvas id="contour" aria-hidden="true"></canvas>
+  <div class="eyebrow">About the map</div>
+  <h2>Sweden commute map</h2>
+  <p class="lead2">Where do people live, and where do they work? The map shows how many people commute between Sweden's 290 municipalities, year by year since 2004, and where the trains run today. It is a personal project built entirely on open data.</p>
+  <p class="meta">Last updated 2026-11-08 · commuting 2004–2024 · timetable ${DAYSTR}</p></div>
+
+ <h3>What the map shows</h3>
+ <p>The map is built on two things that start out unrelated:</p>
+ <ul>
+  <li><strong>Commuting.</strong> How many people live in one municipality and work in another. The figures come from Statistics Sweden and include everyone, whatever way they get to work: car, bus, train, bike or from home.</li>
+  <li><strong>Trains.</strong> Which trains run and how long the trip takes between municipalities, according to the timetable on a regular Tuesday.</li>
+ </ul>
+ <p>Placed side by side, they show where there is a fast train where many people commute, and where there is not. The map says nothing about how many people actually take the train. Neither source holds that figure. It comes from travel surveys and operators' ridership data.</p>
+
+ <h3>Definitions</h3>
+ <dl>
+  <dt>Employed</dt><dd>A person in gainful employment in November of the given year, according to Statistics Sweden's registers. From 2020 people aged 15–74 are counted, before 2020 people aged 16 and over.</dd>
+  <dt>Home municipality</dt><dd>The municipality where the person is registered as living.</dd>
+  <dt>Work municipality</dt><dd>The municipality where the person's workplace is registered. It can differ from where the person actually goes, for example with remote work or when the workplace is registered at a head office.</dd>
+  <dt>Commuter</dt><dd>An employed person whose workplace is in another municipality than their home. Out-commuters are counted from the home municipality, in-commuters to the work municipality.</dd>
+  <dt>Commuter flow</dt><dd>The number of commuters from one municipality to another. The map draws flows of at least 10 people.</dd>
+  <dt>Net commuting</dt><dd>In-commuters minus out-commuters. A positive value means more jobs than employed residents.</dd>
+  <dt>Commuting share</dt><dd>Commuters from municipality A to municipality B divided by all employed people living in A.</dd>
+  <dt>Commuting region</dt><dd>A group of municipalities tied together by commuting. A municipality joins the region its largest group of out-commuters goes to, if the share reaches the threshold.</dd>
+  <dt>Threshold</dt><dd>The commuting share needed for a municipality to join another municipality's region. The default is 10 percent.</dd>
+  <dt>Core</dt><dd>The municipality a region gathers around. If two municipalities point at each other, the one with more jobs becomes the core.</dd>
+  <dt>Independent municipality</dt><dd>A municipality where no single destination reaches the threshold and which is not a core itself.</dd>
+  <dt>Rail connection</dt><dd>The fastest train journey from a station in one municipality to a station in the other, departing 06–09 on a regular Tuesday. Transfers and waiting are included, the trip to and from the station is not.</dd>
+  <dt>Direct train</dt><dd>A train that stops in both municipalities without a transfer.</dd>
+  <dt>Train type</dt><dd>High-speed, long-distance and inter-regional, and regional and commuter trains, as classified in the timetable. Metro and tram are excluded.</dd>
+ </dl>
+
+ <h3>How I calculated</h3>
+ <p><strong>Commuting regions.</strong> For each municipality I take the municipality most of its out-commuters go to. If the share reaches the threshold, the municipality joins that region. <em>Merge chained cores</em> follows the chain upwards so that larger regions appear.</p>
+ <p><strong>Train time.</strong> I search the timetable with a connection scan. The search starts every 15 minutes between 06:00 and 08:45 from all stations in the start municipality and keeps the fastest journey to every other municipality. Transfers need at least 3 minutes. Journeys longer than three hours count as no rail connection.</p>
+ <p><strong>Stations</strong> are linked to the municipality they lie in. Stations named after a neighbouring municipality, such as Sundbyberg, are linked to that municipality.</p>
+
+ <h3>Caveats</h3>
+ <ul>
+  <li>Statistics Sweden changed its basis twice: in 2019 (new data source in RAMS) and in 2020 (BAS replaces RAMS). Do not compare years straight across those breaks.</li>
+  <li>Commuting is for the selected year, trains for the autumn 2026 timetable. The comparison is fairest for recent years.</li>
+  <li>Train time is counted from station to station. People who live far from the station have a longer trip.</li>
+  <li>Without metro and tram, municipalities such as Nacka and Lidingö appear to have no train to Stockholm.</li>
+  <li>Municipal boundaries are simplified and suit an overview, not exact measurement.</li>
+ </ul>
+
+ <h3>Sources and licences</h3>
+ <div class="tblwrap"><table><thead><tr><th>Data</th><th>Source</th><th>Licence</th></tr></thead><tbody>
+  <tr><td>Commuting 2004–2018</td><td>Statistics Sweden, table TAB333 (RAMS)</td><td>CC0 1.0</td></tr>
+  <tr><td>Commuting 2019</td><td>Statistics Sweden, table TAB5850 (RAMS)</td><td>CC0 1.0</td></tr>
+  <tr><td>Commuting 2020–2024</td><td>Statistics Sweden, table TAB1830 (BAS)</td><td>CC0 1.0</td></tr>
+  <tr><td>Timetable</td><td>GTFS Sverige 2 from Trafiklab (Samtrafiken), downloaded via the Mobility Database</td><td>CC0 1.0</td></tr>
+  <tr><td>Rail network</td><td>© OpenStreetMap contributors</td><td>ODbL 1.0</td></tr>
+  <tr><td>Municipal boundaries</td><td>okfse/sweden-geojson, based on Swedish Election Authority data</td><td>free to reuse</td></tr>
+  <tr><td>Map libraries</td><td>D3 and TopoJSON client</td><td>ISC</td></tr>
+  <tr><td>Typefaces</td><td>IBM Plex Sans and IBM Plex Mono</td><td>SIL OFL 1.1</td></tr>
+ </tbody></table></div>
+ <p>The figures are my own processing of the sources' data. They are not official statistics, and the project has no partnership with Statistics Sweden, Trafiklab or any other organisation.</p>
+
+ <h3>Licence for this site</h3>
+ <ul>
+  <li><strong>Source code:</strong> MIT licence.</li>
+  <li><strong>Processed data</strong> (commuting matrices, train times, stations): CC BY 4.0. Credit “Lukas Posolda, Pendlingskartan”.</li>
+  <li><strong>The rail network</strong> is derived from OpenStreetMap and falls under the ODbL. Credit “© OpenStreetMap contributors”.</li>
+ </ul>
+
+ <h3>Creator</h3>
+ <p>The map is made by <a href="https://github.com/lukasposolda-qwertz" rel="author">Lukas Posolda</a>. It is an independent, private project. Code, data and scripts are on <a href="https://github.com/lukasposolda-qwertz/pendlingskartan">GitHub</a>. Found an error? Please open an issue there.</p>
+ <h3>How to cite</h3>
+ <p class="cite">Posolda, L. (2026). Pendlingskartan: commuting and rail in Sweden's municipalities. https://lukasposolda-qwertz.github.io/pendlingskartan/</p>
+ <p><button class="linkbtn" id="about-close">← Back to the map</button></p>`
+};
+
+// ---------- state ----------
+const S = {lang:"sv", view:"map", mode:"dus", year:2024, thr:0.10, cons:false, links:true, ind:"self", tracks:true,
+  rc:{reg:true,fast:true,long:true}, fitm:60,
+  dir:"both", shape:"curved", minf:250, wid:1, bubOn:true, bub:"w", bsz:1, sel:-1, playing:null};
+if (!/^(sv|nb|nn|no|da)\b/i.test(navigator.language||"sv")) S.lang = "en";
+try { const q = new URLSearchParams(location.search).get("lang"); if (q === "en" || q === "sv") S.lang = q; else { const l = localStorage.getItem("pendla-lang"); if (l === "en" || l === "sv") S.lang = l; } } catch(e) {}
+const t = k => T[S.lang][k] ?? k;
+const loc = () => S.lang === "sv" ? "sv-SE" : "en-GB";
+const fmt = v => Math.round(v).toLocaleString(loc());
+const pct = v => isFinite(v) ? (v*100).toLocaleString(loc(), {maximumFractionDigits:0}) + " %" : "–";
+const pct1 = v => (v*100).toLocaleString(loc(), {maximumFractionDigits:1}) + " %";
+const sgn = v => (v>0?"+":v<0?"−":"") + fmt(Math.abs(v));
+const $ = id => document.getElementById(id);
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const isDark = () => { const a=document.documentElement.getAttribute("data-theme"); if (a) return a==="dark"; return matchMedia("(prefers-color-scheme: dark)").matches; };
+const STHLM = P.names.indexOf("Stockholm"), GBG = P.names.indexOf("Göteborg"), MALMO = P.names.indexOf("Malmö");
+
+// ---------- rail data ----------
+const TT = Uint8Array.from(atob(RL.tt), c=>c.charCodeAt(0));
+const tt = (a,b) => TT[a*N+b];               // 255 = no train within window
+const tmin = v => v===255 ? "–" : v+" "+t("min");
+const DIR = new Map(); for (let k=0;k<RL.dir.length;k+=3){ const a=RL.dir[k], b=RL.dir[k+1], key=Math.min(a,b)*N+Math.max(a,b); DIR.set(key,(DIR.get(key)||0)+RL.dir[k+2]); }
+const direct = (a,b) => DIR.get(Math.min(a,b)*N+Math.max(a,b)) || 0;
+const ST = RL.st.map(s=>({name:s[0], lon:s[1], lat:s[2], k:s[3], dep:s[4], tot:s[4][0]+s[4][1]+s[4][2], peak:s[5], ops:s[6]}));
+const kSt = Array.from({length:N},()=>[]); ST.forEach((s,i)=>{ if (s.k>=0) kSt[s.k].push(i); });
+kSt.forEach(a=>a.sort((x,y)=>ST[y].tot-ST[x].tot));
+const kDep = kSt.map(a=>a.reduce((s,i)=>s+ST[i].tot,0)), kPeak = kSt.map(a=>a.reduce((s,i)=>s+ST[i].peak,0));
+const NEAR = i => ST[i].k>=0 || (ST[i].lon>=11.5 && ST[i].lat>=55.3);   // drop distant Danish/Norwegian stations
+const SEGS = RL.seg.filter(s=>NEAR(s[0])&&NEAR(s[1])).map(s=>({a:s[0], b:s[1], fast:s[2], long:s[3], reg:s[4]}));
+
+// ---------- per-year cache ----------
+const cache = {};
+function Y(y){
+  if (cache[y]) return cache[y];
+  const d = P.data[y], outL = Array.from({length:N},()=>[]), inL = Array.from({length:N},()=>[]);
+  const f = d.f;
+  for (let k=0;k<f.length;k+=3){ outL[f[k]].push([f[k+1],f[k+2]]); inL[f[k+1]].push([f[k],f[k+2]]); }
+  outL.forEach(a=>a.sort((a,b)=>b[1]-a[1])); inL.forEach(a=>a.sort((a,b)=>b[1]-a[1]));
+  // rail reach per kommun (flows ≥ 10)
+  const reachO = new Float64Array(N), reachI = new Float64Array(N);
+  for (let i=0;i<N;i++){
+    let a=0,b=0; for (const [j,v] of outL[i]){ a+=v; if (tt(i,j)<=60) b+=v; } reachO[i]= a? b/a : NaN;
+    let c=0,e=0; for (const [j,v] of inL[i]){ c+=v; if (tt(j,i)<=60) e+=v; } reachI[i]= c? e/c : NaN;
+  }
+  return cache[y] = {w:d.w, j:d.j, s:d.s, f, outL, inL, reachO, reachI};
+}
+
+// ---------- DUS ----------
+// region fills: the four Fieldnote series, full and as a 45 % tint
+const tint = (c,bg,k) => d3.interpolateRgb(bg,c)(k);
+const SER_L = ["#23605F","#C08A1E","#A9B795","#5D7A8C"], SER_D = ["#5FA3A0","#D9A53A","#A9B795","#8FA9B8"];
+const PAL_L = [...SER_L.map(c=>tint(c,"#FFFFFF",.55)), ...SER_L.map(c=>tint(c,"#FFFFFF",.3)), ...SER_L.map(c=>tint(c,"#FFFFFF",.85))];
+const PAL_D = [...SER_D.map(c=>tint(c,"#1A2928",.6)), ...SER_D.map(c=>tint(c,"#1A2928",.35)), ...SER_D.map(c=>tint(c,"#1A2928",.85))];
+function dus(){
+  const D = Y(S.year), parent = new Int16Array(N).fill(-1);
+  for (let i=0;i<N;i++){ const top=D.outL[i][0]; if (top && D.w[i]>0 && top[1]/D.w[i] >= S.thr) parent[i]=top[0]; }
+  for (let i=0;i<N;i++){ const p=parent[i]; if (p>=0 && parent[p]===i){ if (D.j[i]>=D.j[p]) parent[i]=-1; else parent[p]=-1; } }
+  const kids = new Int16Array(N); for (let i=0;i<N;i++) if (parent[i]>=0) kids[parent[i]]++;
+  const region = new Int16Array(N);
+  for (let i=0;i<N;i++){
+    if (S.cons){ let r=i,g=0; while(parent[r]>=0 && g++<300) r=parent[r]; region[i]=r; }
+    else region[i] = kids[i] ? i : (parent[i]>=0 ? parent[i] : i);
+  }
+  const size = new Int16Array(N); for (let i=0;i<N;i++) size[region[i]]++;
+  const ids = []; for (let i=0;i<N;i++) if (size[i]>1 && region[i]===i) ids.push(i);
+  const rj = new Float64Array(N); for (let i=0;i<N;i++) rj[region[i]]+=D.j[i];
+  ids.sort((a,b)=>rj[b]-rj[a]);
+  const adj = new Map(ids.map(r=>[r,new Set()]));
+  for (let i=0;i<N;i++) for (const nb of NB[i]) { const a=region[i], b=region[nb]; if (a!==b && adj.has(a) && adj.has(b)) adj.get(a).add(b); }
+  const pal = isDark() ? PAL_D : PAL_L, col = new Map();
+  ids.forEach((r,ix)=>{ const used=new Set([...adj.get(r)].map(x=>col.get(x)).filter(Boolean));
+    col.set(r, pal.find(p=>!used.has(p)) || pal[ix%pal.length]); });
+  return {parent, region, size, col, kids, nreg:ids.length, ids, rj};
+}
+
+// ---------- indicators ----------
+const SEQ = d3.quantize(d3.piecewise(d3.interpolateRgb, ["#FFFFFF","#A9B795","#23605F","#1B2422"]), 6);
+const DIV = d3.quantize(d3.piecewise(d3.interpolateRgb, ["#C08A1E","#FFFFFF","#23605F"]), 9);
+const TIMEB = [30,45,60,90,120,180];
+const TIMEC = d3.quantize(d3.piecewise(d3.interpolateRgb, ["#23605F","#A9B795","#D6DAD5"]), 6);
+const timeColor = v => { if (v===255) return null; for (let k=0;k<TIMEB.length;k++) if (v<=TIMEB[k]) return TIMEC[k]; return TIMEC.at(-1); };
+const IND = {
+  self:{f:(D,i)=>D.s[i]/D.w[i], dom:[0.3,0.95], ramp:SEQ, fmt:pct},
+  out:{f:(D,i)=>(D.w[i]-D.s[i])/D.w[i], dom:[0.05,0.7], ramp:SEQ, fmt:pct},
+  inshare:{f:(D,i)=>(D.j[i]-D.s[i])/D.j[i], dom:[0.05,0.7], ramp:SEQ, fmt:pct},
+  ratio:{f:(D,i)=>100*D.j[i]/D.w[i], dom:[40,100,160], ramp:DIV, fmt:v=>fmt(v)},
+  net:{f:(D,i)=>D.j[i]-D.w[i], dom:[-20000,0,20000], ramp:DIV, fmt:sgn, sym:true},
+  dep:{f:(D,i)=>kDep[i], dom:[0,800], ramp:SEQ, fmt:v=>fmt(v), log:true},
+  reach:{f:(D,i)=>D.reachO[i], dom:[0,0.8], ramp:SEQ, fmt:pct},
+  reachin:{f:(D,i)=>D.reachI[i], dom:[0,0.8], ramp:SEQ, fmt:pct},
+  stock:{f:(D,i)=>tt(i,STHLM), time:true, fmt:tmin}
+};
+function indScale(){
+  const I = IND[S.ind];
+  if (I.time) return v => timeColor(v) || css("--land");
+  if (I.log){ const s=d3.scaleSqrt().domain(d3.range(I.ramp.length).map(k=>I.dom[0]+(I.dom[1]-I.dom[0])*(k/(I.ramp.length-1))**2)).range(I.ramp).clamp(true); return v=> v>0 ? s(v) : css("--land"); }
+  if (I.dom.length===2){ const s=d3.scaleLinear().domain(d3.range(I.ramp.length).map(k=>I.dom[0]+(I.dom[1]-I.dom[0])*k/(I.ramp.length-1))).range(I.ramp).clamp(true); return v => isFinite(v) ? s(v) : css("--land"); }
+  const [lo,mid,hi]=I.dom, h=(I.ramp.length-1)/2;
+  const tr = I.sym ? v=>Math.sign(v)*Math.log1p(Math.abs(v)/500) : v=>v;
+  const L=tr(lo), H=tr(hi), M=tr(mid);
+  const dom = I.ramp.map((_,k)=> k<=h ? L+(M-L)*k/h : M+(H-M)*(k-h)/h);
+  const s = d3.scaleLinear().domain(dom).range(I.ramp).clamp(true);
+  return v=>s(tr(v));
+}
+
+// ---------- geometry ----------
+const topo = P.topo, obj = topo.objects.k;
+const feats = topojson.feature(topo, obj).features;
+feats.forEach(f=>{ const g=f.geometry; const polys = g.type==="Polygon" ? [g.coordinates] : g.coordinates;
+  polys.forEach(p=>{ if (d3.geoArea({type:"Polygon",coordinates:p}) > 2*Math.PI) p.forEach(r=>r.reverse()); }); });
+const NB = topojson.neighbors(obj.geometries);
+const proj = d3.geoTransverseMercator().rotate([-15.5,0]).fitExtent([[0,0],[1000,2000]], {type:"FeatureCollection",features:feats});
+const path = d3.geoPath(proj);
+const A = P.anchor.map(p=>proj(p));
+const SA = ST.map(s=>proj([s.lon,s.lat]));
+const [[bx0,by0],[bx1,by1]] = path.bounds({type:"FeatureCollection",features:feats});
+const fidx = feats.map((f,k)=> f.id!=null ? +f.id : k);
+let trackD = ""; for (const line of RL.osm||[]){ let s=""; for (let k=0;k<line.length;k+=2){ const p=proj([line[k],line[k+1]]); s += (k?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1); } trackD += s; }
+
+const svg = d3.select("#map"), root = svg.append("g");
+const gLand = root.append("g"), gMesh = root.append("path").attr("class","mesh"), gTrack = root.append("path").attr("class","track").attr("d",trackD),
+      gSeg = root.append("g"), gLinks = root.append("g"), gFlows = root.append("g"), gBub = root.append("g"),
+      gStn = root.append("g"), gSel = root.append("path").attr("class","selo"), gLbl = svg.append("g");
+const land = gLand.selectAll("path").data(feats).join("path").attr("class","kom").attr("d",path)
+  .on("pointermove",(ev,f)=>hover(ev,fidx[feats.indexOf(f)]))
+  .on("pointerleave",()=>{tip.hidden=true})
+  .on("click",(ev,f)=>{ev.stopPropagation(); select(fidx[feats.indexOf(f)]);});
+const landByIdx = new Array(N); land.each(function(f,k){ landByIdx[fidx[k]] = this; });
+svg.on("click",()=>{ if (S.mode!=="time") select(-1); });
+
+let K0 = 1, curT = d3.zoomIdentity;
+const zoom = d3.zoom().on("zoom",ev=>{ curT=ev.transform; root.attr("transform",curT); drawBubbles(); drawStations(); drawLabels(); });
+svg.call(zoom).on("dblclick.zoom",null);
+function fit(){
+  const r = svg.node().getBoundingClientRect(), w=r.width, h=r.height; if (!w||!h) return;
+  const k = 0.94*Math.min(w/(bx1-bx0), h/(by1-by0)); K0 = k;
+  zoom.scaleExtent([k*0.7, k*40]);
+  svg.call(zoom.transform, d3.zoomIdentity.translate(w/2 - k*(bx0+bx1)/2, h/2 - k*(by0+by1)/2).scale(k));
+}
+$("zin").onclick = e=>{e.stopPropagation(); svg.transition().duration(250).call(zoom.scaleBy,1.6);};
+$("zout").onclick = e=>{e.stopPropagation(); svg.transition().duration(250).call(zoom.scaleBy,1/1.6);};
+
+// ---------- drawing ----------
+let R = null;
+function flowPath(p1,p2){
+  const [x1,y1]=p1,[x2,y2]=p2;
+  if (S.shape==="straight") return `M${x1},${y1}L${x2},${y2}`;
+  const dx=x2-x1, dy=y2-y1, mx=(x1+x2)/2 - dy*0.2, my=(y1+y2)/2 + dx*0.2;
+  return `M${x1},${y1}Q${mx},${my} ${x2},${y2}`;
+}
+const timeOrigin = () => S.sel>=0 ? S.sel : STHLM;
+function drawFill(){
+  const D = Y(S.year), landC = css("--land");
+  R = dus();
+  gMesh.attr("display", S.mode==="dus" ? null : "none");
+  if (S.mode==="dus"){
+    for (let i=0;i<N;i++){ const r=R.region[i]; landByIdx[i].setAttribute("fill", R.size[r]>1 ? R.col.get(r) : landC); }
+    gMesh.attr("d", path(topojson.mesh(topo,obj,(a,b)=> a===b || R.region[meshIdx.get(a)]!==R.region[meshIdx.get(b)])));
+  } else if (S.mode==="ind"){ const sc=indScale(), I=IND[S.ind]; for (let i=0;i<N;i++) landByIdx[i].setAttribute("fill", sc(I.f(D,i))); }
+  else if (S.mode==="time"){ const o=timeOrigin(); for (let i=0;i<N;i++){ const v = S.dir==="in" ? tt(i,o) : tt(o,i); landByIdx[i].setAttribute("fill", i===o ? css("--fg") : (timeColor(v)||landC)); } }
+  else for (let i=0;i<N;i++) landByIdx[i].setAttribute("fill", landC);
+  gTrack.attr("display", S.tracks ? null : "none");
+}
+const meshIdx = new Map(obj.geometries.map((g,k)=>[g,fidx[k]]));
+function drawLinks(){
+  gLinks.selectAll("line").remove();
+  if (S.mode!=="dus" || !S.links || S.sel>=0) return;
+  const L=[]; for (let i=0;i<N;i++){ const r=R.region[i]; if (r!==i) L.push([i,r]); }
+  gLinks.selectAll("line").data(L).join("line").attr("class","rlink")
+    .attr("x1",d=>A[d[0]][0]).attr("y1",d=>A[d[0]][1]).attr("x2",d=>A[d[1]][0]).attr("y2",d=>A[d[1]][1]);
+}
+function drawSegs(){
+  if (S.mode!=="rail"){ gSeg.selectAll("path").remove(); return; }
+  const cats = ["reg","long","fast"].filter(c=>S.rc[c]);
+  const L = [];
+  for (const s of SEGS){ let n=0, dom=null, dn=-1; for (const c of cats){ n+=s[c]; if (s[c]>dn){dn=s[c];dom=c;} } if (n>0) L.push({s,n,dom}); }
+  L.sort((a,b)=>a.n-b.n);
+  const col = {fast:css("--c-fast"), long:css("--c-long"), reg:css("--c-reg")};
+  gSeg.selectAll("path").data(L).join("path").attr("class","seg-l")
+    .attr("d",d=>`M${SA[d.s.a][0]},${SA[d.s.a][1]}L${SA[d.s.b][0]},${SA[d.s.b][1]}`)
+    .attr("stroke",d=>col[d.dom]).attr("stroke-width",d=>Math.max(1, 0.55*S.wid*Math.sqrt(d.n))).attr("stroke-opacity",.85);
+}
+function fitColor(a,b){ const v=tt(a,b); return v===255 ? css("--c-none") : v<=S.fitm ? css("--hi") : css("--c-long"); }
+function drawFlows(){
+  const D = Y(S.year); let F=[];
+  if (S.sel>=0 && S.mode!=="rail"){
+    if (S.dir!=="in") for (const [j,v] of D.outL[S.sel]) if (v>=S.minf) F.push({a:S.sel,b:j,v,k:"out"});
+    if (S.dir!=="out") for (const [i,v] of D.inL[S.sel]) if (v>=S.minf) F.push({a:i,b:S.sel,v,k:"in"});
+  } else if (S.mode==="net" || S.mode==="fit"){
+    const f=D.f; for (let k=0;k<f.length;k+=3) if (f[k+2]>=S.minf) F.push({a:f[k],b:f[k+1],v:f[k+2],k:"net"});
+  }
+  F.sort((x,y)=>x.v-y.v);
+  const mx = S.sel>=0 ? 14 : 9, ref = S.sel>=0 ? Math.max(...F.map(d=>d.v),1) : 60000;
+  const wS = v => Math.max(0.6, mx*S.wid*Math.sqrt(v/ref));
+  const outC=css("--out"), inC=css("--in");
+  const colr = d => S.mode==="fit" ? fitColor(d.a,d.b) : d.k==="in" ? inC : outC;
+  gFlows.selectAll("path").data(F).join("path").attr("class","flow").attr("d",d=>flowPath(A[d.a],A[d.b]))
+    .attr("stroke",colr).attr("stroke-width",d=>wS(d.v))
+    .attr("stroke-opacity",d=> S.mode==="fit" ? 0.75 : d.k==="net" ? 0.45 : 0.8);
+}
+function drawBubbles(){
+  const D = Y(S.year), arr = S.bub==="w"?D.w:D.j, k=curT.k||1;
+  if (!S.bubOn || S.mode==="rail" || S.mode==="time"){ gBub.selectAll("circle").remove(); return; }
+  const z = Math.sqrt(k/K0), base = 26*S.bsz*z/k, m = 600000;
+  const idx = d3.range(N).sort((a,b)=>arr[b]-arr[a]);
+  gBub.selectAll("circle").data(idx,d=>d).join("circle").attr("class","bub")
+    .attr("cx",i=>A[i][0]).attr("cy",i=>A[i][1]).attr("r",i=>base*Math.sqrt(arr[i]/m))
+    .attr("fill", css("--bubble"))
+    .attr("fill-opacity", i=> S.sel>=0 ? (i===S.sel ? 0.55 : 0.15) : (S.mode==="net"||S.mode==="fit") ? 0.3 : 0.45);
+}
+function drawStations(){
+  const show = S.mode==="rail" || S.mode==="time" || (S.sel>=0 && S.mode!=="dus");
+  if (!show){ gStn.selectAll("circle").remove(); return; }
+  const k=curT.k||1, z=Math.sqrt(k/K0);
+  let idx = d3.range(ST.length).filter(i=>ST[i].k>=0 || (S.mode==="rail" && NEAR(i)));
+  if (S.mode!=="rail") idx = idx.filter(i=>S.mode==="time" ? z>2.2 : ST[i].k===S.sel);
+  idx.sort((a,b)=>ST[b].tot-ST[a].tot);
+  gStn.selectAll("circle").data(idx,d=>d).join("circle").attr("class",i=>"stn"+(ST[i].k===S.sel&&S.sel>=0?" on":""))
+    .attr("cx",i=>SA[i][0]).attr("cy",i=>SA[i][1]).attr("r",i=>(0.9+0.16*Math.sqrt(ST[i].tot))*S.bsz*Math.min(z,2.5)/k)
+    .on("pointermove",(ev,i)=>hoverStation(ev,i)).on("pointerleave",()=>{tip.hidden=true})
+    .on("click",(ev,i)=>{ ev.stopPropagation(); if (ST[i].k>=0) select(ST[i].k); });
+}
+function drawLabels(){
+  const D = Y(S.year), k=curT.k||1, z=k/K0;
+  let L, txt = i=>P.names[i], pos = i=>A[i];
+  if (S.mode==="rail"){
+    const order = d3.range(ST.length).filter(NEAR).sort((a,b)=>ST[b].tot-ST[a].tot);
+    const seen = new Set(), n = Math.max(16,Math.min(Math.round(16*z*z),160));
+    L = []; for (const i of order){ const key = z<3 ? (ST[i].k>=0 ? ST[i].k : ST[i].name) : i; if (seen.has(key)) continue; seen.add(key); L.push(i); if (L.length>=n) break; }
+    txt = i=>ST[i].name; pos = i=>SA[i];
+  } else {
+    let cand = S.mode==="dus" ? d3.range(N).filter(i=>R.region[i]===i && R.size[i]>1) : d3.range(N);
+    cand.sort((a,b)=>D.j[b]-D.j[a]);
+    L = cand.slice(0, Math.max(6,Math.min(Math.round(10*z*z),120)));
+    if (S.sel>=0 && !L.includes(S.sel)) L.unshift(S.sel);
+    if (S.mode==="time"){ const o=timeOrigin(); txt = i=> i===o ? P.names[i] : `${P.names[i]} ${tmin(S.dir==="in"?tt(i,o):tt(o,i))}`; if (!L.includes(o)) L.unshift(o); }
+  }
+  const placed=[];
+  L = L.filter(i=>{ const [x,y]=curT.apply(pos(i)); const w=txt(i).length*6.6+8; const box=[x-w/2,y-21,x+w/2,y-6];
+    if (placed.some(b=>!(box[2]<b[0]||box[0]>b[2]||box[3]<b[1]||box[1]>b[3]))) return false; placed.push(box); return true; });
+  gLbl.selectAll("text").data(L,d=>d).join("text").attr("class","lbl").attr("text-anchor","middle")
+    .attr("x",i=>curT.apply(pos(i))[0]).attr("y",i=>curT.apply(pos(i))[1]-9).text(txt);
+}
+function drawSel(){ gSel.attr("d", S.sel>=0 ? path(feats[fidx.indexOf(S.sel)]) : null); }
+function draw(){
+  drawFill(); drawSegs(); drawLinks(); drawFlows(); drawBubbles(); drawStations(); drawLabels(); drawSel(); legend(); card();
+  $("modenote").textContent = t("mn_"+S.mode);
+  if (!$("dash").hidden) dashboard();
+}
+
+// ---------- tooltips ----------
+const tip = $("tip"), wrap = $("wrap");
+function place(ev,h){
+  const r=wrap.getBoundingClientRect(); tip.innerHTML=h; tip.hidden=false;
+  let x=ev.clientX-r.left+14, y=ev.clientY-r.top+14;
+  if (x+280>r.width) x=ev.clientX-r.left-280; if (y+130>r.height) y=ev.clientY-r.top-130;
+  tip.style.left=x+"px"; tip.style.top=y+"px";
+}
+function hover(ev,i){
+  const D=Y(S.year);
+  let extra = "";
+  if (S.mode==="ind") extra = `<br>${t("i_"+S.ind).replace(/ \(.*\)$/,"")}: <b>${IND[S.ind].fmt(IND[S.ind].f(D,i))}</b>`;
+  if (S.mode==="dus" && R){ const rg=R.region[i]; if (rg!==i) extra = `<br>${t("member")}: <b>${P.names[rg]}</b>`; else if (R.size[i]>1) extra = `<br><b>${t("core")}</b> · ${R.size[i]} ${t("regsize")}`; }
+  if (S.mode==="time"){ const o=timeOrigin(); const v=S.dir==="in"?tt(i,o):tt(o,i); extra = `<br>${t("tip_time")} ${S.dir==="in"?P.names[i]+" → "+P.names[o]:P.names[o]+" → "+P.names[i]}: <b>${tmin(v)}</b>`;
+    const fl = (S.dir==="in"?D.outL[i]:D.outL[o]).find(([j])=> j===(S.dir==="in"?o:i)); if (fl) extra += `<br>${fmt(fl[1])} ${t("tip_pend")} ${D.f?"("+S.year+")":""}`; }
+  if (kDep[i]) extra += `<br>${fmt(kDep[i])} ${t("tip_dep")}`;
+  place(ev, `<b>${P.names[i]}</b><br>${fmt(D.w[i])} ${t("tip_w")} · ${fmt(D.j[i])} ${t("tip_j")}<br>${pct(D.s[i]/D.w[i])} ${t("tip_self")}${extra}`);
+}
+function hoverStation(ev,i){
+  const s=ST[i];
+  const parts = [["fast",0],["long",1],["reg",2]].filter(([c,k])=>s.dep[k]).map(([c,k])=>`${fmt(s.dep[k])} ${t("lg_"+c).toLowerCase()}`).join("<br>");
+  place(ev, `<b>${s.name}</b>${s.k>=0?" · "+P.names[s.k]:""}<br><b>${fmt(s.tot)}</b> ${t("tip_dep")} · ${fmt(s.peak)} ${t("tip_peak")}<br>${parts}<br><span style="font-size:var(--fs-xs)">${s.ops.join(", ")}</span>`);
+}
+
+// ---------- detail card ----------
+const cardEl = $("card");
+function spark(vals,color){
+  const W=150,H=42, years=P.years, mn=Math.min(...vals), mx=Math.max(...vals);
+  const x=d3.scaleLinear().domain([years[0],years.at(-1)]).range([2,W-4]), y=d3.scaleLinear().domain([mn,mx===mn?mn+1:mx]).range([H-4,4]);
+  const line=d3.line().x((v,k)=>x(years[k])).y(v=>y(v))(vals);
+  const area=d3.area().x((v,k)=>x(years[k])).y0(H).y1(v=>y(v))(vals);
+  const cy = years.indexOf(S.year);
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><line x1="${x(2018.5)}" x2="${x(2018.5)}" y1="0" y2="${H}" stroke="var(--rule)" stroke-dasharray="2 2"/><line x1="${x(2019.5)}" x2="${x(2019.5)}" y1="0" y2="${H}" stroke="var(--rule)" stroke-dasharray="2 2"/><path d="${area}" fill="${color}" fill-opacity=".14"/><path d="${line}" fill="none" stroke="${color}" stroke-width="1.6" vector-effect="non-scaling-stroke"/><circle cx="${x(S.year)}" cy="${y(vals[cy])}" r="3" fill="${color}"/></svg>`;
+}
+const chip = v => `<span class="tchip${v<=60?" ok":""}">${v===255?"–":v+" min"}</span>`;
+function card(){
+  if (S.sel<0){ cardEl.hidden=true; return; }
+  const i=S.sel, D=Y(S.year), w=D.w[i], j=D.j[i], s=D.s[i], out=w-s, inn=j-s;
+  const rr = R || dus();
+  const reg=rr.region[i]; let badge;
+  if (reg===i && rr.size[i]>1) badge = rr.parent[i]>=0 && !S.cons ? `<span class="badge core">${t("coreDep")} ${P.names[rr.parent[i]]}</span>` : `<span class="badge core">${t("core")}</span>`;
+  else if (reg!==i) badge = `<span class="badge mem">${t("member")} ${P.names[reg]}</span>`;
+  else badge = `<span class="badge mem">${t("indep")}</span>`;
+  const top = (L,isOut)=>{ const items=L.slice(0,6); if (!items.length) return `<div class="empty">${t("none")}</div>`;
+    const mx=items[0][1];
+    return items.map(([k,v])=>`<button data-k="${k}"><span class="n">${P.names[k]}</span><span class="num">${isOut? pct1(v/w)+" · ":""}${fmt(v)}</span>${chip(isOut?tt(i,k):tt(k,i))}<span class="bar" style="width:${100*v/mx}%;background:${isOut?"var(--out)":"var(--in)"}"></span></button>`).join(""); };
+  const ws = P.years.map(y=>P.data[y].w[i]), js = P.years.map(y=>P.data[y].j[i]);
+  const sts = kSt[i];
+  const rail = sts.length ? `<div class="grid3"><div><div class="l">${t("r_st")}</div><div class="v">${sts.length}</div></div><div><div class="l">${t("r_dep")}</div><div class="v">${fmt(kDep[i])}</div></div><div><div class="l">${t("r_peak")}</div><div class="v">${fmt(kPeak[i])}</div></div></div>
+    <div class="stlist">${sts.slice(0,5).map(k=>`<div><span>${ST[k].name}</span><span>${fmt(ST[k].tot)}</span></div>`).join("")}</div>`
+    : `<div class="empty">${t("r_nost")}</div>`;
+  const to3 = [STHLM,GBG,MALMO].filter(k=>k!==i).map(k=>`<div><div class="l">${t("r_to")} ${P.names[k]}</div><div class="v">${tmin(tt(i,k))}</div></div>`).join("");
+  cardEl.innerHTML = `<div class="chead"><div><h2>${P.names[i]}</h2>${badge}</div><button class="x" id="cx" aria-label="${t("close")}">✕</button></div>
+  <div class="big3"><div><div class="v">${pct(s/w)}</div><div class="l">${t("k_self")}</div></div><div><div class="v">${pct(out/w)}</div><div class="l">${t("k_out")}</div></div><div><div class="v">${pct(inn/j)}</div><div class="l">${t("k_infill")}</div></div></div>
+  <div class="grid3">
+   <div><div class="l">${t("g_w")}</div><div class="v">${fmt(w)}</div></div>
+   <div><div class="l">${t("g_j")}</div><div class="v">${fmt(j)}</div></div>
+   <div><div class="l">${t("g_ratio")}</div><div class="v">${fmt(100*j/w)}</div></div>
+   <div><div class="l">${t("g_out")}</div><div class="v">${fmt(out)}</div></div>
+   <div><div class="l">${t("g_in")}</div><div class="v">${fmt(inn)}</div></div>
+   <div><div class="l">${t("g_net")}</div><div class="v">${sgn(j-w)}</div></div>
+   <div><div class="l">${reg===i?t("g_mem"):t("g_core")}</div><div class="v">${reg===i?rr.size[i]:P.names[reg]}</div></div>
+   <div style="grid-column:span 2"><div class="l">${t("g_lan")}</div><div class="v">${LAN[P.lan[i]]||""}</div></div>
+  </div>
+  <div class="railbox"><div class="lab">${t("rail_h")}</div>${rail}
+   <div><span style="font-size:26px;font-weight:300">${pct(D.reachO[i])}</span> <span style="font-size:var(--fs-s)">${t("r_reach")}</span><div class="note" style="font-size:var(--fs-xs);margin-top:3px">${t("r_reach2")}</div></div>
+   <div class="grid3">${to3}</div></div>
+  <div class="spark"><div><div class="l">${t("sp_w")}</div>${spark(ws,"var(--out)")}</div><div><div class="l">${t("sp_j")}</div>${spark(js,"var(--in)")}</div></div>
+  <div class="sec"><div class="lab">${t("topd")}</div><div class="toplist">${top(D.outL[i],true)}</div></div>
+  <div class="sec"><div class="lab">${t("topo")}</div><div class="toplist">${top(D.inL[i],false)}</div></div>
+  <div class="note">${t("esc")}</div>`;
+  cardEl.hidden=false;
+  cardEl.querySelector("#cx").onclick=()=>select(-1);
+  cardEl.querySelectorAll(".toplist button").forEach(b=>b.onclick=()=>select(+b.dataset.k));
+}
+function select(i){ S.sel=i; draw(); }
+
+// ---------- legend ----------
+function legend(){
+  const el=$("legend"); let h="";
+  const line = (c,lab,w=3,op=1)=>`<div class="k"><span class="sw" style="border-color:${c};border-top-width:${w}px;opacity:${op}"></span>${lab}</div>`;
+  if (S.mode==="dus"){
+    const pal=isDark()?PAL_D:PAL_L;
+    h += `<div class="k"><span style="display:flex">${pal.slice(0,4).map(c=>`<span style="width:6px;height:12px;background:${c}"></span>`).join("")}</span>${t("lg_region")}</div>`;
+    h += `<div class="k"><span class="box" style="width:24px;background:var(--land);border:1px solid var(--rule)"></span>${t("lg_indep")}</div>`;
+    h += line("var(--mesh)",t("lg_border"),1.5);
+    if (S.links) h += line("var(--link)",t("lg_link"),1);
+    h += `<div class="note"><b style="font-weight:600">${R?R.nreg:""}</b> ${t("regions")} · ${pct(S.thr)}</div>`;
+  } else if (S.mode==="ind"){
+    const I=IND[S.ind];
+    h += `<div style="font-size:var(--fs-s)">${t("i_"+S.ind)}</div>`;
+    if (I.time) h += timeSteps();
+    else {
+      h += `<div class="ramp" style="background:linear-gradient(90deg,${I.ramp.join(",")})"></div>`;
+      const ticks = I.dom.length===2 ? [I.dom[0],(I.dom[0]+I.dom[1])/2,I.dom[1]] : I.dom;
+      h += `<div class="ticks">${ticks.map((v,k)=>`<span>${k===ticks.length-1?"≥ ":""}${I.fmt(v)}</span>`).join("")}</div>`;
+    }
+  } else if (S.mode==="rail"){
+    h += line("var(--c-reg)",t("lg_reg"),4)+line("var(--c-long)",t("lg_long"),4)+line("var(--c-fast)",t("lg_fast"),4);
+    h += `<div class="k"><span style="width:12px;height:12px;border-radius:50%;border:1px solid var(--fg);background:var(--panel);margin:0 5px"></span>${t("lg_stn")}</div>`;
+  } else if (S.mode==="time"){
+    h += `<div style="font-size:var(--fs-s)">${t("lg_time")} <b style="font-weight:600">${P.names[timeOrigin()]}</b></div>` + timeSteps();
+  } else if (S.mode==="fit"){
+    h += line("var(--hi)",`${t("lg_fit_ok")} (≤ ${S.fitm} min)`)+line("var(--c-long)",t("lg_fit_slow"))+line("var(--c-none)",t("lg_fit_no"))+`<div class="note">${t("lg_fit_note")}</div>`;
+  }
+  if (S.tracks) h += line("var(--track)",t("lg_track"),1);
+  if (S.mode==="net" && S.sel<0) h += line("var(--out)",t("lg_net"),3,.6);
+  if (S.sel>=0 && S.mode!=="rail" && S.mode!=="fit") h += line("var(--out)",t("lg_out"))+line("var(--in)",t("lg_in"));
+  if (S.bubOn && S.mode!=="rail" && S.mode!=="time") h += `<div class="k"><span style="width:12px;height:12px;border-radius:50%;background:var(--bubble);opacity:.55;margin:0 5px"></span>${t("lg_bub")}: ${t(S.bub==="w"?"b_w":"b_j").toLowerCase()}</div>`;
+  if (S.sel<0 && S.mode!=="rail") h += `<div class="note">${t("lg_hint")}</div>`;
+  el.innerHTML=h;
+}
+function timeSteps(){
+  const labs = ["≤30","45","60","90","120","180"];
+  return `<div class="steps">${TIMEC.map((c,k)=>`<div><span style="background:${c}"></span>${labs[k]}</div>`).join("")}<div><span style="background:var(--land);border:1px solid var(--rule)"></span>–</div></div><div class="note">${t("min")} · – = ${t("lg_none").toLowerCase()}</div>`;
+}
+
+// ---------- dashboard ----------
+function haversine(a,b){ const [l1,p1]=P.anchor[a],[l2,p2]=P.anchor[b], r=Math.PI/180;
+  const h=Math.sin((p2-p1)*r/2)**2+Math.cos(p1*r)*Math.cos(p2*r)*Math.sin((l2-l1)*r/2)**2; return 12742*Math.asin(Math.sqrt(h)); }
+function dashboard(){
+  const D=Y(S.year), el=$("dash-in");
+  let tot=0, ok=0, n200=0; const f=D.f; for (let k=0;k<f.length;k+=3){ tot+=f[k+2]; if (tt(f[k],f[k+1])<=60) ok+=f[k+2]; if (f[k+2]>=200) n200++; }
+  let allOut=0, allW=0; for (let i=0;i<N;i++){ allOut += D.w[i]-D.s[i]; allW += D.w[i]; }
+  const nSt = ST.filter(s=>s.k>=0).length, nKom = new Set(ST.filter(s=>s.k>=0).map(s=>s.k)).size;
+  let nDir=0; const DR=RL.dir; for (let k=0;k<DR.length;k+=3) nDir++;
+  const tag = k => `<span class="src src-${k}">${t("src_"+k)}</span>`;
+  const sec = (n,k,title,d) => `<div class="dsec"><div class="dsec-h"><span class="dnum">${n}</span><div><h3>${title} ${tag(k)}</h3><p>${d}</p></div></div></div>`;
+  el.innerHTML = `<div><h2>${t("d_title")}</h2><p class="sub">${t("d_sub")}</p></div>
+  <div class="readme" role="note"><div class="readme-h">${t("r_h")}</div><div class="readme-g">
+   <div class="ri"><div>${tag("scb")}</div><b>${t("r1t")}</b><p>${t("r1")}</p></div>
+   <div class="ri"><div>${tag("tt")}</div><b>${t("r2t")}</b><p>${t("r2")}</p></div>
+   <div class="ri"><div>${tag("both")}</div><b>${t("r3t")}</b><p>${t("r3")}</p></div>
+  </div></div>
+  ${sec(1,"scb",t("s1"),t("s1d"))}
+  <div class="kpis k3">
+   <div><div class="v">${(allOut/1e6).toLocaleString(loc(),{maximumFractionDigits:2})} ${S.lang==="sv"?"milj.":"m"}</div><div class="d">${t("k3")} (${S.year})</div></div>
+   <div><div class="v">${pct(allOut/allW)}</div><div class="d">${t("k5")}</div></div>
+   <div><div class="v">${fmt(n200)}</div><div class="d">${t("k6")}</div></div>
+  </div>
+  ${sec(2,"tt",t("s2"),t("s2d"))}
+  <div class="kpis">
+   <div><div class="v">${fmt(nSt)}</div><div class="d">${t("k1")}</div></div>
+   <div><div class="v">${fmt(RL.ntrains||0)}</div><div class="d">${t("k2")}</div></div>
+   <div><div class="v">${fmt(nKom)}</div><div class="d">${t("k7")}</div></div>
+   <div><div class="v">${fmt(nDir)}</div><div class="d">${t("k8")}</div></div>
+  </div>
+  <div class="panels">
+   <div class="pan wide"><h3>${t("p4")} ${tag("tt")}</h3><p>${t("p4d")}</p>
+    <div class="lg"><span><span class="box" style="background:var(--c-reg)"></span>${t("lg_reg")}</span><span><span class="box" style="background:var(--c-long)"></span>${t("lg_long")}</span><span><span class="box" style="background:var(--c-fast)"></span>${t("lg_fast")}</span></div>
+    <div id="stb"></div></div>
+  </div>
+  ${sec(3,"both",t("s3"),t("s3d"))}
+  <div class="kpis k1x"><div><div class="v">${pct(ok/tot)}</div><div class="d">${t("k4")} (${S.year})<div class="kn">${t("k4n")}</div></div></div></div>
+  <div class="panels">
+   <div class="pan wide"><h3>${t("p1")} ${tag("both")}</h3><p>${t("p1d")}</p>
+    <div class="lg"><span><span class="box" style="background:var(--c-fast);border-radius:50%;width:10px;height:10px"></span>${t("lg_direct")}</span><span><span class="box" style="background:var(--c-reg);border-radius:50%;width:10px;height:10px"></span>${t("lg_change")}</span><span><span class="box" style="background:var(--c-none);border-radius:50%;width:10px;height:10px"></span>${t("lg_notrain")}</span></div>
+    <div id="scat"></div></div>
+   <div class="pan"><h3>${t("p2")} ${tag("both")}</h3><p>${t("p2d")}</p><div class="tblwrap" id="gap"></div></div>
+   <div class="pan"><h3>${t("p5")} ${tag("both")}</h3><p>${t("p5d")}</p><div id="coh"></div></div>
+   <div class="pan wide"><h3>${t("p3")} ${tag("both")}</h3><p>${t("p3d")}</p><div id="lanb"></div></div>
+  </div>`;
+  scatter(D); gapTable(D); cohesion(D); lanBars(D); stationBars();
+}
+function openKommun(i){ setView("map"); select(i); }
+function scatter(D){
+  const box=$("scat"), W=Math.max(320, box.clientWidth||900), H=380, m={l:56,r:16,t:10,b:42};
+  const pts=[]; const f=D.f;
+  for (let k=0;k<f.length;k+=3){ const v=f[k+2]; if (v<200) continue; const a=f[k], b=f[k+1], tv=tt(a,b);
+    pts.push({a,b,v,tv,dir:direct(a,b)>0}); }
+  const xw = W-m.l-m.r, nonew=46;
+  const x = d3.scaleLinear().domain([0,180]).range([m.l, m.l+xw-nonew-10]);
+  const xn = m.l+xw-nonew/2;
+  const y = d3.scaleLog().domain([200, d3.max(pts,p=>p.v)*1.1]).range([H-m.b, m.t]);
+  const jit = i => ((i*9301+49297)%233280)/233280-0.5;
+  pts.forEach((p,i)=>{ p.x = p.tv===255 ? xn + jit(i)*nonew*0.8 : x(Math.min(p.tv,180)); p.y=y(p.v); });
+  pts.sort((p,q)=>p.v-q.v);
+  const col = p => p.tv===255 ? "var(--c-none)" : p.dir ? "var(--c-fast)" : "var(--c-reg)";
+  const yt = [200,500,1000,2000,5000,10000,20000,50000].filter(v=>v<=y.domain()[1]);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${t("p1")}">`;
+  s += `<g class="grid">${yt.map(v=>`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}"/>`).join("")}${[30,60,90,120,150,180].map(v=>`<line x1="${x(v)}" x2="${x(v)}" y1="${m.t}" y2="${H-m.b}"/>`).join("")}</g>`;
+  s += `<rect x="${x(0)}" y="${m.t}" width="${x(60)-x(0)}" height="${H-m.b-m.t}" fill="var(--hi)" fill-opacity=".09"/>`;
+  s += `<g class="axis">${yt.map(v=>`<text x="${m.l-6}" y="${y(v)+4}" text-anchor="end">${fmt(v)}</text>`).join("")}${[0,30,60,90,120,150,180].map(v=>`<text x="${x(v)}" y="${H-m.b+16}" text-anchor="middle">${v}</text>`).join("")}<text x="${xn}" y="${H-m.b+16}" text-anchor="middle">${t("p1n")}</text>
+   <text x="${(m.l+x(180))/2}" y="${H-6}" text-anchor="middle">${t("p1x")}</text><text transform="translate(12,${(H-m.b+m.t)/2}) rotate(-90)" text-anchor="middle">${t("p1y")}</text>
+   <line x1="${xn-nonew/2-4}" x2="${xn-nonew/2-4}" y1="${m.t}" y2="${H-m.b}" stroke="var(--fg)"/></g>`;
+  s += pts.map((p,i)=>`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(2+Math.sqrt(p.v)/40).toFixed(1)}" fill="${col(p)}" fill-opacity=".72" stroke="var(--panel)" stroke-width=".6"/>`).join("");
+  const big = [], boxes = [];
+  for (const p of pts.slice().reverse()){ if (big.length>=10 || p.v<3000) break;
+    const lab = `${P.names[p.a]} → ${P.names[p.b]}`, w = lab.length*6.2, b=[p.x+7, p.y-9, p.x+7+w, p.y+5];
+    if (b[2] > W-m.r) continue;
+    if (boxes.some(q=>!(b[2]<q[0]||b[0]>q[2]||b[3]<q[1]||b[1]>q[3]))) continue; boxes.push(b); big.push(p); }
+  s += big.map(p=>`<text class="nl" x="${p.x+7}" y="${p.y+4}" style="paint-order:stroke;stroke:var(--panel);stroke-width:3px">${P.names[p.a]} → ${P.names[p.b]}</text>`).join("");
+  s += `<circle id="sc-h" r="0" fill="none" stroke="var(--fg)" stroke-width="1.5"/></svg>`;
+  box.innerHTML = s;
+  const sv = box.querySelector("svg"), del = d3.Delaunay.from(pts,p=>p.x,p=>p.y), hc = sv.querySelector("#sc-h");
+  const pick = ev => { const r=sv.getBoundingClientRect(), sx=(ev.clientX-r.left)*W/r.width, sy=(ev.clientY-r.top)*H/r.height; const i=del.find(sx,sy); const p=pts[i]; return Math.hypot(p.x-sx,p.y-sy)<24 ? p : null; };
+  sv.onpointermove = ev => { const p=pick(ev); if (!p){ tip.hidden=true; hc.setAttribute("r",0); return; }
+    hc.setAttribute("cx",p.x); hc.setAttribute("cy",p.y); hc.setAttribute("r",2+Math.sqrt(p.v)/40+3);
+    place(ev, `<b>${P.names[p.a]} → ${P.names[p.b]}</b><br>${fmt(p.v)} ${t("tip_all")} (${S.year})<br>${t("tip_conn")}: <b>${tmin(p.tv)}</b><br>${t("th_d")}: ${fmt(direct(p.a,p.b))}`); };
+  sv.onpointerleave = ()=>{ tip.hidden=true; hc.setAttribute("r",0); };
+  sv.onclick = ev => { const p=pick(ev); if (p){ tip.hidden=true; openKommun(p.a); } };
+  sv.style.cursor="pointer";
+}
+function gapTable(D){
+  const rows=[]; const f=D.f;
+  for (let k=0;k<f.length;k+=3){ const a=f[k], b=f[k+1], v=f[k+2]; if (v<500) continue; const tv=tt(a,b); if (tv<=60) continue; const km=haversine(a,b); if (km>120 || km<15) continue; rows.push({a,b,v,tv,km}); }
+  rows.sort((p,q)=>q.v-p.v);
+  $("gap").innerHTML = `<table><thead><tr><th>${t("th_from")}</th><th>${t("th_to")}</th><th class="r">${t("th_n")}</th><th class="r">${t("th_km")}</th><th class="r">${t("th_t")}</th><th class="r">${t("th_d")}</th></tr></thead><tbody>${
+    rows.slice(0,14).map(r=>`<tr class="clk" data-k="${r.a}"><td>${P.names[r.a]}</td><td>${P.names[r.b]}</td><td class="r">${fmt(r.v)}</td><td class="r">${fmt(r.km)}</td><td class="r">${tmin(r.tv)}</td><td class="r">${fmt(direct(r.a,r.b))}</td></tr>`).join("")}</tbody></table>`;
+  $("gap").querySelectorAll("tr.clk").forEach(tr=>tr.onclick=()=>openKommun(+tr.dataset.k));
+}
+function hbars(elId, rows, opts={}){
+  const box=$(elId), W=Math.max(300, box.clientWidth||520), lw=opts.lw||140, rh=22, H=rows.length*rh+8, vw=56;
+  const mx = opts.max ?? d3.max(rows,r=>r.total ?? r.v);
+  const x = d3.scaleLinear().domain([0,mx]).range([0, W-lw-vw]);
+  let s=`<svg viewBox="0 0 ${W} ${H}" role="img">`;
+  rows.forEach((r,i)=>{ const yy=i*rh+4;
+    s += `<text class="nl" x="${lw-8}" y="${yy+14}" text-anchor="end">${r.label}</text>`;
+    if (r.parts){ let xx=lw; r.parts.forEach(([v,c])=>{ s+=`<rect x="${xx}" y="${yy+3}" width="${Math.max(0,x(v))}" height="${rh-8}" fill="${c}"/>`; xx+=x(v); }); }
+    else s += `<rect x="${lw}" y="${yy+3}" width="${Math.max(0,x(r.v))}" height="${rh-8}" fill="${r.c||"var(--c-long)"}"/>`;
+    s += `<text class="vl" x="${lw+x(r.total ?? r.v)+6}" y="${yy+14}">${r.vl}</text>`;
+    if (r.k!=null) s += `<rect x="0" y="${yy}" width="${W}" height="${rh}" fill="transparent" data-k="${r.k}" style="cursor:pointer"/>`;
+  });
+  box.innerHTML = s+"</svg>";
+  box.querySelectorAll("rect[data-k]").forEach(e=>e.onclick=()=>openKommun(+e.dataset.k));
+}
+function lanBars(D){
+  const agg={}; for (let i=0;i<N;i++){ const l=P.lan[i]; agg[l]=agg[l]||[0,0]; for (const [j,v] of D.outL[i]){ agg[l][0]+=v; if (tt(i,j)<=60) agg[l][1]+=v; } }
+  const rows = Object.entries(agg).map(([l,[a,b]])=>({label:LAN[l].replace(" län",""), v:b/a, vl:pct(b/a)})).sort((p,q)=>q.v-p.v);
+  rows.forEach(r=>r.c = "var(--c-reg)"); rows[0].c="var(--hi)";
+  hbars("lanb", rows, {max:1, lw:130});
+}
+function stationBars(){
+  const order = d3.range(ST.length).sort((a,b)=>ST[b].tot-ST[a].tot).slice(0,15);
+  hbars("stb", order.map(i=>({label:ST[i].name, total:ST[i].tot, vl:fmt(ST[i].tot), k:ST[i].k>=0?ST[i].k:null,
+    parts:[[ST[i].dep[2],"var(--c-reg)"],[ST[i].dep[1],"var(--c-long)"],[ST[i].dep[0],"var(--c-fast)"]]})), {lw:170});
+}
+function cohesion(D){
+  const rr = dus(), rows=[];
+  for (const r of rr.ids){ if (rr.size[r]<3) continue; let a=0,b=0;
+    for (let i=0;i<N;i++){ if (rr.region[i]!==r || i===r) continue; const fl=D.outL[i].find(([j])=>j===r); if (fl){ a+=fl[1]; if (tt(i,r)<=45) b+=fl[1]; } }
+    if (a) rows.push({label:`${P.names[r]} (${rr.size[r]})`, v:b/a, vl:pct(b/a), k:r, j:rr.rj[r]}); }
+  rows.sort((p,q)=>q.j-p.j);
+  const top = rows.slice(0,15); top.forEach(r=>r.c = r.v>=0.5 ? "var(--hi)" : "var(--c-reg)");
+  hbars("coh", top, {max:1, lw:170});
+}
+
+// ---------- controls ----------
+function seg(id,key,after){ $(id).querySelectorAll("button").forEach(b=>b.onclick=()=>{ S[key]=b.dataset.v; $(id).querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x===b)); after&&after(); draw(); }); }
+seg("mode","mode",()=>{
+  $("ctl-dus").style.display = S.mode==="dus"?"flex":"none"; $("ctl-ind").hidden = S.mode!=="ind"; $("ctl-rail").hidden = S.mode!=="rail"; $("ctl-fit").hidden = S.mode!=="fit";
+  if (S.mode==="time" && S.sel<0) S.sel = STHLM;
+  if (S.mode==="fit" || S.mode==="rail") S.sel = -1;
+  setView("map", true);
+});
+seg("dir","dir"); seg("shape","shape"); seg("bub","bub");
+function setView(v, silent){ S.view=v; $("dash").hidden = v!=="dash"; $("view").querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed",x.dataset.v===v)); if (v==="dash"){ $("dash").scrollTop=0; dashboard(); } }
+$("view").querySelectorAll("button").forEach(b=>b.onclick=()=>setView(b.dataset.v));
+const MINF = [10,25,50,100,250,500,1000,2500,5000,10000];
+function setMinf(){ S.minf = MINF[+$("minf").value]; $("minf-o").textContent = fmt(S.minf); }
+$("minf").oninput=()=>{ setMinf(); drawFlows(); };
+$("thr").oninput=()=>{ S.thr=$("thr").value/100; $("thr-o").textContent=$("thr").value+" %"; draw(); };
+$("cons").onchange=()=>{ S.cons=$("cons").checked; draw(); };
+$("links").onchange=()=>{ S.links=$("links").checked; draw(); };
+$("tracks").onchange=()=>{ S.tracks=$("tracks").checked; draw(); };
+$("rail-c").onchange=()=>{ S.rc.reg=$("rail-c").checked; drawSegs(); };
+$("rail-f").onchange=()=>{ S.rc.fast=$("rail-f").checked; drawSegs(); };
+$("rail-r").onchange=()=>{ S.rc.long=$("rail-r").checked; drawSegs(); };
+$("fitm").oninput=()=>{ S.fitm=+$("fitm").value; $("fitm-o").textContent=S.fitm+" min"; drawFlows(); legend(); };
+$("ind").onchange=()=>{ S.ind=$("ind").value; draw(); };
+$("wid").oninput=()=>{ S.wid=+$("wid").value; $("wid-o").textContent=S.wid.toLocaleString(loc(),{minimumFractionDigits:1})+"×"; drawFlows(); drawSegs(); };
+$("bsz").oninput=()=>{ S.bsz=+$("bsz").value; $("bsz-o").textContent=S.bsz.toLocaleString(loc(),{minimumFractionDigits:1})+"×"; drawBubbles(); drawStations(); };
+$("bub-on").onchange=()=>{ S.bubOn=$("bub-on").checked; drawBubbles(); legend(); };
+function setYear(y){ S.year=y; $("year").value=y; $("year-o").textContent=y; breakNote(); draw(); }
+$("year").oninput=()=>setYear(+$("year").value);
+$("play").onclick=()=>{
+  if (S.playing){ clearInterval(S.playing); S.playing=null; $("play").textContent="▶"; $("play").setAttribute("aria-label",t("play")); return; }
+  if (S.year>=2024) setYear(2004);
+  $("play").textContent="❚❚"; $("play").setAttribute("aria-label",t("pause"));
+  S.playing=setInterval(()=>{ if (S.year>=2024){ $("play").click(); return; } setYear(S.year+1); }, 750);
+};
+function breakNote(){ $("breaknote").textContent = S.year===2019 ? t("brk2019") : S.year===2020 ? t("brk2020") : t("brkall"); }
+$("search").onchange=()=>{ const v=$("search").value.trim().toLowerCase(); const i=P.names.findIndex(n=>n.toLowerCase()===v); if (i>=0){ setView("map"); select(i); $("search").value=""; zoomTo(i); } };
+function zoomTo(i){ const r=svg.node().getBoundingClientRect(); const k=Math.max(curT.k, K0*3); svg.transition().duration(500).call(zoom.transform, d3.zoomIdentity.translate(r.width/2-k*A[i][0], r.height/2-k*A[i][1]).scale(k)); }
+document.addEventListener("keydown",e=>{
+  if (e.target.matches("input,select")) return;
+  if (e.key==="Escape"){ if (!$("about").hidden) $("about").hidden=true; else if (!$("dash").hidden) setView("map"); else select(-1); }
+  if (S.sel>=0 && $("dash").hidden && (e.key==="ArrowRight"||e.key==="ArrowLeft")){
+    const order=d3.range(N).sort((a,b)=>P.names[a].localeCompare(P.names[b],"sv")); const p=order.indexOf(S.sel);
+    select(order[(p+(e.key==="ArrowRight"?1:-1)+N)%N]);
+  }
+});
+$("about-btn").onclick=()=>{ $("about").hidden=false; $("about").scrollTop=0; drawContour($("contour"),0.62,0.5); };
+function drawContour(cv, cxf, cyf){
+  if (!cv) return; const r = cv.getBoundingClientRect(); if (!r.width) return;
+  const d = window.devicePixelRatio || 1; cv.width = r.width*d; cv.height = r.height*d;
+  const x = cv.getContext("2d"); x.setTransform(d,0,0,d,0,0); x.clearRect(0,0,r.width,r.height);
+  x.strokeStyle = css("--contour");
+  const w=r.width, h=r.height, cx=w*cxf, cy=h*cyf;
+  for (let i=1;i<=14;i++){
+    const b = i*Math.max(w,400)*0.028; x.lineWidth = i%5===0 ? 1.4 : 1; x.beginPath();
+    for (let st=0; st<=180; st++){
+      const a = st/180*Math.PI*2;
+      const k = 1+0.17*Math.sin(3*a+i*0.32)+0.08*Math.sin(5*a+1.3-i*0.1)+0.05*Math.sin(8*a-i*0.21);
+      const px = cx+Math.cos(a)*b*k*1.25, py = cy+Math.sin(a)*b*k*0.85;
+      st ? x.lineTo(px,py) : x.moveTo(px,py);
+    }
+    x.closePath(); x.stroke();
+  }
+}
+
+// ---------- language ----------
+function applyLang(){
+  document.documentElement.lang=S.lang;
+  document.querySelectorAll("[data-t]").forEach(el=>el.textContent=t(el.dataset.t));
+  document.querySelectorAll("[data-th]").forEach(el=>el.innerHTML=t(el.dataset.th)); document.documentElement.lang=S.lang;
+  $("lang-sv").setAttribute("aria-pressed",S.lang==="sv"); $("lang-en").setAttribute("aria-pressed",S.lang==="en");
+  $("search").placeholder=t("search");
+  $("ind").innerHTML = Object.keys(IND).map(k=>`<option value="${k}"${k===S.ind?" selected":""}>${t("i_"+k)}</option>`).join("");
+  $("about-in").innerHTML = ABOUT[S.lang]; $("about-close").onclick=()=>{$("about").hidden=true;}; if (!$("about").hidden) drawContour($("contour"),0.62,0.5);
+  $("play").setAttribute("aria-label", t(S.playing?"pause":"play"));
+  $("thr-o").textContent=$("thr").value+" %";
+  $("wid-o").textContent=S.wid.toLocaleString(loc(),{minimumFractionDigits:1})+"×";
+  $("bsz-o").textContent=S.bsz.toLocaleString(loc(),{minimumFractionDigits:1})+"×";
+  setMinf(); breakNote(); draw();
+}
+["sv","en"].forEach(l=>$("lang-"+l).onclick=()=>{ S.lang=l; try{localStorage.setItem("pendla-lang",l);}catch(e){} applyLang(); });
+$("komlist").innerHTML = P.names.map(n=>`<option value="${n}">`).sort().join("");
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",()=>draw());
+new MutationObserver(()=>draw()).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+let rz; new ResizeObserver(()=>{ fit(); clearTimeout(rz); rz=setTimeout(()=>{ if (!$("dash").hidden) dashboard(); },200); }).observe(svg.node());
+applyLang();
+fit();
+})();
+</script>
+</body>
+</html>
