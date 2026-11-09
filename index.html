@@ -84,7 +84,7 @@ select,.search{width:100%;padding:6px 8px;border:1px solid var(--fg);background:
 .steps div{font-size:10px;text-align:center;font-variant-numeric:tabular-nums}
 .steps span{display:block;height:12px;margin-bottom:2px}
 .foot{margin-top:auto;font-size:var(--fs-xs);line-height:1.4;border-top:1px solid var(--fg);padding-top:8px}
-.linkbtn{color:inherit;text-decoration:underline;background:none;border:0;padding:0;cursor:pointer;font-size:inherit}
+.linkbtn{color:var(--accent);text-decoration:underline;background:none;border:0;padding:0;cursor:pointer;font-size:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .mapwrap{position:relative;min-width:0;background:var(--sea);overflow:hidden}
@@ -92,6 +92,12 @@ select,.search{width:100%;padding:6px 8px;border:1px solid var(--fg);background:
 .kom{stroke:var(--land-stroke);stroke-width:.6;vector-effect:non-scaling-stroke;cursor:pointer}
 .kom:hover{stroke:var(--sel);stroke-width:1.4}
 .mesh{fill:none;stroke:var(--mesh);stroke-width:1.3;vector-effect:non-scaling-stroke;stroke-linejoin:round;pointer-events:none}
+/* county border: dash-dot, the cartographic convention for administrative borders */
+.lanb{fill:none;stroke:var(--fg);stroke-opacity:.75;stroke-width:1.1;stroke-dasharray:7 3 1.5 3;vector-effect:non-scaling-stroke;stroke-linejoin:round;pointer-events:none}
+/* railway: thin line with cross ties, the cartographic convention for railways */
+.ties{fill:none;stroke:var(--track);stroke-width:5;stroke-dasharray:1 7;stroke-opacity:.8;vector-effect:non-scaling-stroke;pointer-events:none}
+.sym{flex:none;display:block}
+.lead a,.lead button{white-space:nowrap}
 .track{fill:none;stroke:var(--track);stroke-width:1.1;stroke-opacity:.8;vector-effect:non-scaling-stroke;pointer-events:none;stroke-linejoin:round}
 .seg-l{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;pointer-events:none}
 .flow{fill:none;vector-effect:non-scaling-stroke;stroke-linecap:round;pointer-events:none}
@@ -247,7 +253,7 @@ tr.clk:hover td{background:var(--chip)}
     </div>
     <div>
       <h1><span data-t="title"></span></h1>
-      <p class="lead" data-t="lead"></p>
+      <p class="lead"><span data-t="lead"></span> <button class="linkbtn" id="lead-more" data-t="about_more"></button></p>
     </div>
     <div class="viewtog" id="view"><button data-v="map" aria-pressed="true" data-t="v_map"></button><button data-v="dash" aria-pressed="false" data-t="v_dash"></button></div>
 
@@ -281,6 +287,7 @@ tr.clk:hover td{background:var(--chip)}
         <input type="range" id="fitm" min="20" max="120" step="5" value="60" aria-label="Restidsgräns">
       </div>
       <div class="row"><label><input type="checkbox" id="tracks" checked><span data-t="tracks"></span></label></div>
+      <div class="row"><label><input type="checkbox" id="lanb" checked><span data-t="lanbt"></span></label></div>
       <input class="search" id="search" list="komlist" autocomplete="off">
       <datalist id="komlist"></datalist>
     </div>
@@ -355,23 +362,23 @@ const LAN = {"01":"Stockholms län","03":"Uppsala län","04":"Södermanlands lä
 const DAYSTR = RL.day.slice(0,4)+"-"+RL.day.slice(4,6)+"-"+RL.day.slice(6);
 
 const T = {
- sv:{title:"Pendlingskartan",lead:"Var bor folk, och var jobbar de? Kartan visar hur många som pendlar mellan Sveriges kommuner och var tågen går. Den visar inte hur många som tar tåget.",
+ sv:{title:"Pendlingskartan",lead:"Var bor folk, och var jobbar de? Kartan visar vilka kommuner som hänger ihop genom pendling, hur många som pendlar mellan dem och var tågen går. Den visar inte hur många som tar tåget.",
   v_map:"Karta",v_dash:"Analys",
   map:"Kartläge",m_dus:"Regioner",m_net:"Pendling",m_ind:"Indikatorer",m_rail:"Tågtrafik",m_time:"Restid tåg",m_fit:"Pendling mot tågutbud",
-  mn_dus:"Pendlingsregioner: varje kommun går till den kommun dit flest pendlar, om andelen når tröskeln.",
+  mn_dus:"Färgerna är pendlingsregioner, inte län. En kommun får samma färg som kommunen dit flest av dess invånare pendlar, om minst tröskelandelen gör det. Vita kommuner når inte tröskeln.",
   mn_net:"Alla pendlingsflöden mellan kommuner över minsta flöde.",
   mn_ind:"Färglägg kommunerna efter ett nyckeltal, även tågmått.",
   mn_rail:"Tågtrafiken en vanlig tisdag ("+DAYSTR+"). Linjetjocklek = tåg per dag mellan två stationer.",
   mn_time:"Snabbaste tågresa från vald kommun, morgonavgång 06–09 inklusive byten och väntan. Klicka på en kommun för att byta start.",
   mn_fit:"Pendlingsflöden enligt SCB (alla färdsätt) färgade efter om tidtabellen har en tågförbindelse mellan kommunerna inom gränsen. Visar var tåget kan vara ett alternativ, inte hur många som åker tåg.",
-  thr:"Tröskel",cons:"Slå ihop kärnor i kedjor",links:"Visa regionlänkar",tracks:"Visa järnvägsnätet",
+  thr:"Tröskel",cons:"Slå ihop kärnor i kedjor",links:"Visa regionlänkar",tracks:"Visa järnvägsnätet",lanbt:"Visa länsgränser",lg_lan:"Länsgräns",about_more:"Så läser du kartan →",
   rail_c:"Regionaltåg",rail_f:"Snabbtåg",rail_r:"Fjärr- och interregionala tåg",fitmax:"Restidsgräns",
   year:"År (pendling)",flows:"Flöden",both:"Båda",out:"Ut",in:"In",curved:"Böjda",straight:"Raka",minflow:"Minsta flöde",width:"Linjebredd",
   bubbles:"Bubblor",show:"Visa",b_w:"Sysselsatta boende",b_j:"Arbetstillfällen",size:"Storlek",legend:"Teckenförklaring",
   search:"Sök kommun …",howlink:"Om kartan: definitioner, källor och licenser",
   source:"Ett personligt projekt av Lukas Posolda. Data: SCB och Trafiklab (CC0), järnvägsnät © OpenStreetMap-bidragsgivare (ODbL). Kod: MIT. <a href=\"https://github.com/lukasposolda-qwertz/pendlingskartan\">Källkod på GitHub</a>",
   brk2019:"Tidsseriebrott 2019: ny datakälla (AGI) i RAMS.",brk2020:"Tidsseriebrott 2020: BAS ersätter RAMS (sysselsatta 15–74 år).",brkall:"Tidsseriebrott 2019 och 2020. Tågdata gäller tidtabellen hösten 2026.",
-  lg_region:"Kommun i en pendlingsregion (färg = region)",lg_indep:"Fristående kommun",lg_border:"Regiongräns",lg_link:"Regionlänk: andel ≥ tröskel till kärnan",
+  lg_region:"Pendlingsregion, beräknad ur pendlingen (inte län)",lg_indep:"Kommun utan stark pendling till en annan kommun",lg_border:"Gräns mellan pendlingsregioner",lg_link:"Regionlänk: andel ≥ tröskel till kärnan",
   lg_out:"Utpendling från vald kommun",lg_in:"Inpendling till vald kommun",lg_net:"Pendlingsflöde mellan kommuner",lg_bub:"Bubbla = antal",lg_hint:"Klicka på en kommun för att se dess flöden.",
   lg_track:"Järnväg (OpenStreetMap)",lg_stn:"Station, storlek = avgångar per dag",lg_fast:"Snabbtåg",lg_long:"Fjärr- och interregionala tåg",lg_reg:"Regional- och pendeltåg",
   lg_time:"Restid med tåg från",lg_none:"Ingen tågresa inom 3 timmar",lg_fit_ok:"Tågförbindelse inom gränsen",lg_fit_slow:"Tågförbindelse, längre restid",lg_fit_no:"Ingen tågförbindelse inom 3 h",lg_fit_note:"Linjerna är pendlare med alla färdsätt (SCB). Färgen visar tågutbudet, inte färdsättet.",lg_from:"Startkommun",
@@ -403,23 +410,23 @@ const T = {
   p4:"Mest trafikerade stationer",p4d:"Avgångar en vanlig tisdag, uppdelat på tågslag.",
   p5:"Har regionernas pendlingsstråk tågförbindelse till kärnan?",p5d:"Andel av pendlingen (alla färdsätt) från medlemskommunerna till regionkärnan som kommer från kommuner med en tågförbindelse på högst 45 minuter dit. Regioner enligt vald tröskel.",
   open:"Öppna",regsize:"kommuner"},
- en:{title:"Sweden Commute Map",lead:"Where do people live, and where do they work? The map shows how many people commute between Sweden's municipalities and where the trains run. It does not show how many of them take the train.",
+ en:{title:"Sweden Commute Map",lead:"Where do people live, and where do they work? The map shows which municipalities are tied together by commuting, how many people commute between them and where the trains run. It does not show how many of them take the train.",
   v_map:"Map",v_dash:"Analysis",
   map:"Map mode",m_dus:"Regions",m_net:"Commuting",m_ind:"Indicators",m_rail:"Rail traffic",m_time:"Train time",m_fit:"Commuting vs rail supply",
-  mn_dus:"Commuting regions: each municipality joins the one most of its commuters go to, if the share reaches the threshold.",
+  mn_dus:"Colours are commuting regions, not counties. A municipality takes the colour of the municipality most of its residents commute to, if at least the threshold share does. White municipalities do not reach the threshold.",
   mn_net:"All commuter flows between municipalities above the minimum flow.",
   mn_ind:"Colour municipalities by a measure, rail measures included.",
   mn_rail:"Train traffic on a regular Tuesday ("+DAYSTR+"). Line width = trains per day between two stations.",
   mn_time:"Fastest train journey from the selected municipality, morning departure 06–09 incl. transfers and waiting. Click a municipality to change the start.",
   mn_fit:"Commuter flows from SCB (all modes) coloured by whether the timetable has a rail connection between the municipalities within the limit. Shows where rail could be an option, not how many take the train.",
-  thr:"Threshold",cons:"Merge chained cores",links:"Show region links",tracks:"Show the rail network",
+  thr:"Threshold",cons:"Merge chained cores",links:"Show region links",tracks:"Show the rail network",lanbt:"Show county borders",lg_lan:"County border",about_more:"How to read the map →",
   rail_c:"Regional trains",rail_f:"High-speed trains",rail_r:"Long-distance and inter-regional",fitmax:"Travel-time limit",
   year:"Year (commuting)",flows:"Flows",both:"Both",out:"Out",in:"In",curved:"Curved",straight:"Straight",minflow:"Min. flow",width:"Line width",
   bubbles:"Bubbles",show:"Show",b_w:"Resident workers",b_j:"Jobs",size:"Size",legend:"Legend",
   search:"Find a municipality …",howlink:"About: definitions, sources and licences",
   source:"A personal project by Lukas Posolda. Data: Statistics Sweden and Trafiklab (CC0), rail network © OpenStreetMap contributors (ODbL). Code: MIT. <a href=\"https://github.com/lukasposolda-qwertz/pendlingskartan\">Source on GitHub</a>",
   brk2019:"Series break 2019: new data source (AGI) in RAMS.",brk2020:"Series break 2020: BAS replaces RAMS (employed 15–74).",brkall:"Series breaks in 2019 and 2020. Rail data is the autumn 2026 timetable.",
-  lg_region:"Municipality in a commuting region (colour = region)",lg_indep:"Independent municipality",lg_border:"Region border",lg_link:"Region link: share ≥ threshold to the core",
+  lg_region:"Commuting region, derived from commuting (not a county)",lg_indep:"Municipality without strong commuting to another",lg_border:"Border between commuting regions",lg_link:"Region link: share ≥ threshold to the core",
   lg_out:"Out-commuting from selected municipality",lg_in:"In-commuting to selected municipality",lg_net:"Commuter flow between municipalities",lg_bub:"Bubble = count",lg_hint:"Click a municipality to see its flows.",
   lg_track:"Railway (OpenStreetMap)",lg_stn:"Station, size = departures per day",lg_fast:"High-speed trains",lg_long:"Long-distance and inter-regional",lg_reg:"Regional and commuter trains",
   lg_time:"Train time from",lg_none:"No train journey within 3 hours",lg_fit_ok:"Rail connection within the limit",lg_fit_slow:"Rail connection, slower",lg_fit_no:"No rail connection within 3 h",lg_fit_note:"Lines are commuters by all modes (SCB). Colour shows rail supply, not mode of travel.",lg_from:"Start",
@@ -459,13 +466,17 @@ const ABOUT = {
   <p class="lead2">Var bor folk, och var jobbar de? Kartan visar hur många som pendlar mellan Sveriges 290 kommuner, år för år sedan 2004, och var tågen går i dag. Det är ett personligt projekt som bygger helt på öppna data.</p>
   <p class="meta">Senast uppdaterad 2026-11-08 · pendling 2004–2024 · tidtabell ${DAYSTR}</p></div>
 
- <h3>Vad kartan visar</h3>
- <p>Kartan bygger på två saker som inte har med varandra att göra från början:</p>
+ <h3 id="om-vad">Vad kartan visar</h3>
+ <p><strong>Kartan visar i första hand pendlingsregioner.</strong> En pendlingsregion är en grupp kommuner som hänger ihop genom att många pendlar mellan dem. Det är alltså inte län eller andra administrativa indelningar. Regionerna räknas fram ur SCB:s pendlingsdata för det år du väljer, och gränserna följer var folk bor och jobbar.</p>
+ <p>Så läser du färgerna:</p>
  <ul>
-  <li><strong>Pendling.</strong> Hur många som bor i en kommun och arbetar i en annan. Siffrorna kommer från SCB och gäller alla, oavsett hur de tar sig till jobbet: bil, buss, tåg, cykel eller hemifrån.</li>
-  <li><strong>Tåg.</strong> Vilka tåg som går och hur lång tid resan tar mellan kommunerna, enligt tidtabellen en vanlig tisdag.</li>
+  <li><strong>Varje färgad yta är en pendlingsregion.</strong> Den samlas kring en kärna, oftast en större stad, dit många från de omgivande kommunerna pendlar. Exempel: Östersund med Krokom, Bräcke, Berg, Ragunda och Åre.</li>
+  <li><strong>En kommun ingår i en region</strong> när minst 10 procent av de sysselsatta som bor där arbetar i samma kommun. Du kan ändra gränsen med reglaget Tröskel.</li>
+  <li><strong>Vita kommuner</strong> når inte gränsen mot någon annan kommun. De flesta som bor där jobbar i hemkommunen, eller så sprids pendlingen åt flera håll.</li>
+  <li><strong>Färgen betyder inget i sig.</strong> Den skiljer bara grannregioner åt. Samma färg på två ställen betyder inte att regionerna hör ihop.</li>
+  <li><strong>Streckprickade linjer</strong> är länsgränser, så att du kan jämföra pendlingsregionerna med den administrativa indelningen.</li>
  </ul>
- <p>När de två läggs bredvid varandra syns var det finns ett snabbt tåg där många pendlar, och var det saknas. Kartan säger däremot inget om hur många som faktiskt åker tåg. Den uppgiften finns inte i någon av källorna. Den finns i resvaneundersökningar och i operatörernas resandestatistik.</p>
+ <p>Ovanpå regionerna kan du lägga <strong>tågtrafiken</strong>: vilka tåg som går och hur lång tid resan tar mellan kommunerna, enligt tidtabellen en vanlig tisdag. Pendlingen och tågen kommer från två olika källor. Pendlingen räknar alla, oavsett om de åker bil, buss, tåg, cykel eller jobbar hemifrån. När källorna läggs bredvid varandra syns var det finns ett snabbt tåg där många pendlar, och var det saknas. Kartan visar däremot inte hur många som faktiskt åker tåg. Den uppgiften finns i resvaneundersökningar och i operatörernas resandestatistik.</p>
 
  <h3>Definitioner</h3>
  <dl>
@@ -531,13 +542,17 @@ const ABOUT = {
   <p class="lead2">Where do people live, and where do they work? The map shows how many people commute between Sweden's 290 municipalities, year by year since 2004, and where the trains run today. It is a personal project built entirely on open data.</p>
   <p class="meta">Last updated 2026-11-08 · commuting 2004–2024 · timetable ${DAYSTR}</p></div>
 
- <h3>What the map shows</h3>
- <p>The map is built on two things that start out unrelated:</p>
+ <h3 id="om-vad">What the map shows</h3>
+ <p><strong>First of all, the map shows commuting regions.</strong> A commuting region is a group of municipalities tied together because many people commute between them. They are not counties or any other administrative division. The regions are derived from Statistics Sweden's commuting data for the year you pick, and their borders follow where people live and work.</p>
+ <p>How to read the colours:</p>
  <ul>
-  <li><strong>Commuting.</strong> How many people live in one municipality and work in another. The figures come from Statistics Sweden and include everyone, whatever way they get to work: car, bus, train, bike or from home.</li>
-  <li><strong>Trains.</strong> Which trains run and how long the trip takes between municipalities, according to the timetable on a regular Tuesday.</li>
+  <li><strong>Each coloured area is a commuting region.</strong> It gathers around a core, usually a larger town, that many people from the surrounding municipalities commute to. Example: Östersund with Krokom, Bräcke, Berg, Ragunda and Åre.</li>
+  <li><strong>A municipality joins a region</strong> when at least 10 percent of the employed people living there work in the same municipality. You can change that limit with the Threshold slider.</li>
+  <li><strong>White municipalities</strong> do not reach the limit towards any other municipality. Most residents work in their home municipality, or commuting spreads in several directions.</li>
+  <li><strong>The colour has no meaning of its own.</strong> It only tells neighbouring regions apart. The same colour in two places does not mean the regions belong together.</li>
+  <li><strong>Dash-dot lines</strong> are county borders, so you can compare the commuting regions with the administrative division.</li>
  </ul>
- <p>Placed side by side, they show where there is a fast train where many people commute, and where there is not. The map says nothing about how many people actually take the train. Neither source holds that figure. It comes from travel surveys and operators' ridership data.</p>
+ <p>On top of the regions you can add <strong>rail traffic</strong>: which trains run and how long the trip takes between municipalities, according to the timetable on a regular Tuesday. Commuting and trains come from two separate sources. Commuting counts everyone, whether they go by car, bus, train, bike or work from home. Side by side, they show where there is a fast train where many people commute, and where there is not. The map does not show how many people actually take the train. That figure comes from travel surveys and operators' ridership data.</p>
 
  <h3>Definitions</h3>
  <dl>
@@ -599,7 +614,7 @@ const ABOUT = {
 };
 
 // ---------- state ----------
-const S = {lang:"sv", view:"map", mode:"dus", year:2024, thr:0.10, cons:false, links:true, ind:"self", tracks:true,
+const S = {lang:"sv", view:"map", mode:"dus", year:2024, thr:0.10, cons:false, links:true, ind:"self", tracks:true, lanb:true,
   rc:{reg:true,fast:true,long:true}, fitm:60,
   dir:"both", shape:"curved", minf:250, wid:1, bubOn:true, bub:"w", bsz:1, sel:-1, playing:null};
 if (!/^(sv|nb|nn|no|da)\b/i.test(navigator.language||"sv")) S.lang = "en";
@@ -718,7 +733,7 @@ const fidx = feats.map((f,k)=> f.id!=null ? +f.id : k);
 let trackD = ""; for (const line of RL.osm||[]){ let s=""; for (let k=0;k<line.length;k+=2){ const p=proj([line[k],line[k+1]]); s += (k?"L":"M")+p[0].toFixed(1)+","+p[1].toFixed(1); } trackD += s; }
 
 const svg = d3.select("#map"), root = svg.append("g");
-const gLand = root.append("g"), gMesh = root.append("path").attr("class","mesh"), gTrack = root.append("path").attr("class","track").attr("d",trackD),
+const gLand = root.append("g"), gLan = root.append("path").attr("class","lanb"), gMesh = root.append("path").attr("class","mesh"), gTrack = root.append("path").attr("class","track").attr("d",trackD), gTies = root.append("path").attr("class","ties").attr("d",trackD),
       gSeg = root.append("g"), gLinks = root.append("g"), gFlows = root.append("g"), gBub = root.append("g"),
       gStn = root.append("g"), gSel = root.append("path").attr("class","selo"), gLbl = svg.append("g");
 const land = gLand.selectAll("path").data(feats).join("path").attr("class","kom").attr("d",path)
@@ -755,13 +770,15 @@ function drawFill(){
   gMesh.attr("display", S.mode==="dus" ? null : "none");
   if (S.mode==="dus"){
     for (let i=0;i<N;i++){ const r=R.region[i]; landByIdx[i].setAttribute("fill", R.size[r]>1 ? R.col.get(r) : landC); }
-    gMesh.attr("d", path(topojson.mesh(topo,obj,(a,b)=> a===b || R.region[meshIdx.get(a)]!==R.region[meshIdx.get(b)])));
+    gMesh.attr("d", path(topojson.mesh(topo,obj,(a,b)=>{ if (a===b) return true; const ra=R.region[meshIdx.get(a)], rb=R.region[meshIdx.get(b)]; return ra!==rb && (R.size[ra]>1 || R.size[rb]>1); })));
   } else if (S.mode==="ind"){ const sc=indScale(), I=IND[S.ind]; for (let i=0;i<N;i++) landByIdx[i].setAttribute("fill", sc(I.f(D,i))); }
   else if (S.mode==="time"){ const o=timeOrigin(); for (let i=0;i<N;i++){ const v = S.dir==="in" ? tt(i,o) : tt(o,i); landByIdx[i].setAttribute("fill", i===o ? css("--fg") : (timeColor(v)||landC)); } }
   else for (let i=0;i<N;i++) landByIdx[i].setAttribute("fill", landC);
-  gTrack.attr("display", S.tracks ? null : "none");
+  gTrack.attr("display", S.tracks ? null : "none"); gTies.attr("display", S.tracks ? null : "none");
+  gLan.attr("display", S.lanb ? null : "none");
 }
 const meshIdx = new Map(obj.geometries.map((g,k)=>[g,fidx[k]]));
+gLan.attr("d", path(topojson.mesh(topo,obj,(a,b)=> a!==b && P.lan[meshIdx.get(a)]!==P.lan[meshIdx.get(b)])));
 function drawLinks(){
   gLinks.selectAll("line").remove();
   if (S.mode!=="dus" || !S.links || S.sel>=0) return;
@@ -953,7 +970,9 @@ function legend(){
   } else if (S.mode==="fit"){
     h += line("var(--hi)",`${t("lg_fit_ok")} (≤ ${S.fitm} min)`)+line("var(--c-long)",t("lg_fit_slow"))+line("var(--c-none)",t("lg_fit_no"))+`<div class="note">${t("lg_fit_note")}</div>`;
   }
-  if (S.tracks) h += line("var(--track)",t("lg_track"),1);
+  const sym = (svg,lab)=>`<div class="k"><svg class="sym" width="24" height="10" viewBox="0 0 24 10" aria-hidden="true">${svg}</svg>${lab}</div>`;
+  if (S.lanb) h += sym('<line x1="0" y1="5" x2="24" y2="5" stroke="var(--fg)" stroke-opacity=".75" stroke-width="1.1" stroke-dasharray="7 3 1.5 3"/>', t("lg_lan"));
+  if (S.tracks) h += sym('<line x1="0" y1="5" x2="24" y2="5" stroke="var(--track)" stroke-width="1.1"/><line x1="0" y1="5" x2="24" y2="5" stroke="var(--track)" stroke-width="5" stroke-dasharray="1 7" stroke-dashoffset="-3"/>', t("lg_track"));
   if (S.mode==="net" && S.sel<0) h += line("var(--out)",t("lg_net"),3,.6);
   if (S.sel>=0 && S.mode!=="rail" && S.mode!=="fit") h += line("var(--out)",t("lg_out"))+line("var(--in)",t("lg_in"));
   if (S.bubOn && S.mode!=="rail" && S.mode!=="time") h += `<div class="k"><span style="width:12px;height:12px;border-radius:50%;background:var(--bubble);opacity:.55;margin:0 5px"></span>${t("lg_bub")}: ${t(S.bub==="w"?"b_w":"b_j").toLowerCase()}</div>`;
@@ -1113,6 +1132,7 @@ $("thr").oninput=()=>{ S.thr=$("thr").value/100; $("thr-o").textContent=$("thr")
 $("cons").onchange=()=>{ S.cons=$("cons").checked; draw(); };
 $("links").onchange=()=>{ S.links=$("links").checked; draw(); };
 $("tracks").onchange=()=>{ S.tracks=$("tracks").checked; draw(); };
+$("lanb").onchange=()=>{ S.lanb=$("lanb").checked; draw(); };
 $("rail-c").onchange=()=>{ S.rc.reg=$("rail-c").checked; drawSegs(); };
 $("rail-f").onchange=()=>{ S.rc.fast=$("rail-f").checked; drawSegs(); };
 $("rail-r").onchange=()=>{ S.rc.long=$("rail-r").checked; drawSegs(); };
@@ -1141,6 +1161,7 @@ document.addEventListener("keydown",e=>{
   }
 });
 $("about-btn").onclick=()=>{ $("about").hidden=false; $("about").scrollTop=0; drawContour($("contour"),0.62,0.5); };
+$("lead-more").onclick=()=>{ $("about").hidden=false; drawContour($("contour"),0.62,0.5); const h=$("om-vad"); if (h) h.scrollIntoView({block:"start"}); };
 function drawContour(cv, cxf, cyf){
   if (!cv) return; const r = cv.getBoundingClientRect(); if (!r.width) return;
   const d = window.devicePixelRatio || 1; cv.width = r.width*d; cv.height = r.height*d;
